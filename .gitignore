@@ -1,0 +1,5 @@
+keys/*.pem
+.build/
+build/
+*.xcuserstate
+.DS_Store
