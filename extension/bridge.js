@@ -4,6 +4,11 @@
   if (window.__nowPlayingBridge) return;
   window.__nowPlayingBridge = true;
   const CHANNEL = 'nowplaying-v1';
+  // Opt-in diagnostics: localStorage['nowplaying-debug'] = '1' in the YouTube tab (no data leaves the page).
+  const debug = (() => { try { return localStorage.getItem('nowplaying-debug') === '1'; } catch { return false; } })();
+  const log = (...args) => { if (debug) console.debug('[nowplaying]', ...args); };
+  const describe = t => t?.languageCode ? t.languageCode + (t.kind === 'asr' ? ':asr' : '') +
+    (t.translationLanguage?.languageCode ? '→' + t.translationLanguage.languageCode : '') + (t.vss_id ? '[listed]' : '') : String(t);
   const originalFetch = window.fetch;
   let lyricsBrowse = null, lyricsVideo = '', ccBusy = false;
   const videoId = () => new URL(location.href).searchParams.get('v') ||
@@ -54,6 +59,15 @@
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   // The player does not refetch a track it already loaded, so keep the last few captured tracks.
   const captured = new Map(); // `${videoId}|${trackId}` → {cues, lang, trackKind}
+  // Track ids the server refused for a video (e.g. 429 rate limiting on translations): stop waiting.
+  const refused = new Set();
+  function noteRefused(url, status, id) {
+    if (url.pathname !== '/api/timedtext') return;
+    const tlang = url.searchParams.get('tlang'), lang = url.searchParams.get('lang') || '';
+    const trackId = tlang ? 'x-' + tlang : lang + (url.searchParams.get('kind') === 'asr' ? ':asr' : '');
+    refused.add(`${id}|${trackId}`);
+    log('refused', trackId, status);
+  }
   function remember(id, trackId, value) {
     const key = `${id}|${trackId}`;
     captured.delete(key); captured.set(key, value);
@@ -67,11 +81,13 @@
   async function selectCaptionsNow(trackId) {
     const p = document.querySelector('#movie_player');
     const button = document.querySelector('.ytp-subtitles-button');
-    if (ccBusy || !p?.setOption || !button || button.disabled) return;
+    if (ccBusy || !p?.setOption || !button || button.disabled) { log('select skipped', trackId, {ccBusy, player: !!p?.setOption, button: !!button}); return; }
     const id = videoId();
+    log('select', trackId);
     const hit = captured.get(`${id}|${trackId}`);
     if (hit) { post('captions', {videoId: id, ...hit}); return; }
     ccBusy = true;
+    refused.delete(`${id}|${trackId}`); // a refusal from an earlier attempt doesn't count for this one
     const wasOn = button.getAttribute('aria-pressed') === 'true';
     const current = () => { try { return p.getOption('captions', 'track'); } catch { return null; } };
     // The player's caption state in the plain form setOption accepts, including an active translation
@@ -104,20 +120,42 @@
         isWanted = () => current()?.languageCode === lang && (current()?.kind === 'asr') === asr && !current()?.translationLanguage;
       }
       // The track list may still be loading right after navigation.
+      // The player honors the plain {languageCode, kind} form in most states, but while a translation is
+      // active it ignores it and only accepts the track object from its own track list. Alternate.
+      // Changing the translation target while one is active is ignored too: step back to the native
+      // base track first (listed object), then apply the translation from there.
+      const listed = (code, isAsr) => {
+        let list = [];
+        try { list = p.getOption('captions', 'tracklist') || []; } catch {}
+        return list.find(t => t?.languageCode === code && (t.kind === 'asr') === isAsr) || null;
+      };
       for (let i = 0; i < 12 && videoId() === id && !isWanted(); i++) {
-        // Only the plain {languageCode, kind} form is honored; a full track object is ignored.
-        try { p.setOption('captions', 'track', want); } catch {}
+        const translated = !!current()?.translationLanguage;
+        let next = want;
+        if (i % 2 === 1) {
+          if (!translateTo) next = listed(lang, asr) || want;
+          else if (translated) next = listed(want.languageCode, want.kind === 'asr') || want;
+        }
+        try { p.setOption('captions', 'track', next); } catch (e) { log('setOption threw', String(e)); }
         await sleep(250);
+        log('  attempt', i, describe(next), '->', describe(current()));
       }
       if (videoId() !== id) return;
+      log('wanted reached:', isWanted(), 'current', describe(current()), 'original', describe(original));
       if (isWanted()) {
-        for (let i = 0; i < 10 && !captured.has(`${id}|${trackId}`); i++) await sleep(200);
+        // Translations are generated server-side and can take several seconds; give them longer
+        // before the player's own state is restored (which can cancel the request).
+        for (let i = 0; i < (translateTo ? 20 : 10) && !captured.has(`${id}|${trackId}`) && !refused.has(`${id}|${trackId}`); i++) await sleep(200);
+        log('captured in time:', captured.has(`${id}|${trackId}`));
         const got = captured.get(`${id}|${trackId}`);
         if (got) post('captions', {videoId: id, ...got}); // re-post in case it raced the app's choice
       }
       if (videoId() !== id || !button.isConnected) return;
-      if (original && !same(simple(current()), original)) {
-        try { p.setOption('captions', 'track', original); } catch {}
+      // Restore the player's own selection (with the same step-back out of an active translation).
+      for (let i = 0; i < 4 && original && videoId() === id && !same(simple(current()), original); i++) {
+        const next = i % 2 === 1 && current()?.translationLanguage
+          ? (listed(original.languageCode, original.kind === 'asr') || original) : original;
+        try { p.setOption('captions', 'track', next); } catch {}
         await sleep(150);
       }
       if (!wasOn && button.getAttribute('aria-pressed') === 'true') button.click();
@@ -150,6 +188,7 @@
       const lang = url.searchParams.get('tlang') || url.searchParams.get('lang') || '';
       const translated = !!url.searchParams.get('tlang');
       const trackKind = asr && !translated ? 'asr' : 'manual';
+      log('captured', url.searchParams.get('lang'), url.searchParams.get('tlang') || '', url.searchParams.get('kind') || '', cues.length);
       if (cues.length) {
         remember(id, translated ? 'x-' + lang : lang + (trackKind === 'asr' ? ':asr' : ''), {cues, lang, trackKind, translated});
         post('captions', {videoId: id, cues, lang, trackKind, translated});
@@ -170,7 +209,8 @@
     const id = videoId();
     const result = originalFetch.call(this, input, init);
     if (url) result.then(response => {
-      if (!response.ok || Number(response.headers.get('content-length')) > 3_000_000) return;
+      if (!response.ok) { noteRefused(url, response.status, id); return; }
+      if (Number(response.headers.get('content-length')) > 3_000_000) return;
       response.clone().text().then(text => inspect(url, text, id)).catch(() => {});
     }).catch(() => {});
     return result;
@@ -186,6 +226,7 @@
     const info = xhrInfo.get(this);
     if (info?.url) this.addEventListener('load', () => {
       try {
+        if (this.status >= 400) noteRefused(info.url, this.status, info.id);
         if (this.status >= 200 && this.status < 300) inspect(info.url,
           this.responseType === 'json' ? JSON.stringify(this.response) : this.responseText, info.id);
       } catch { /* Binary/blocked response. */ }

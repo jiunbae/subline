@@ -7,8 +7,14 @@ APP="$ROOT/build/NowPlaying.app"
 cd "$ROOT/app"
 # Universal (Apple Silicon + Intel) by default; ARCHS="arm64" for a faster local build.
 ARCH_FLAGS=(); for a in ${ARCHS:-arm64 x86_64}; do ARCH_FLAGS+=(--arch "$a"); done
-swift build -c release "${ARCH_FLAGS[@]}"
-BIN="$(swift build -c release "${ARCH_FLAGS[@]}" --show-bin-path)"
+# APPSTORE=1 compiles out private-API use (see BackgroundCursor.swift).
+SWIFT_FLAGS=(); if [[ "${APPSTORE:-0}" == 1 ]]; then SWIFT_FLAGS+=(-Xswiftc -DAPPSTORE); fi
+swift build -c release "${ARCH_FLAGS[@]}" ${SWIFT_FLAGS[@]+"${SWIFT_FLAGS[@]}"}
+BIN="$(swift build -c release "${ARCH_FLAGS[@]}" ${SWIFT_FLAGS[@]+"${SWIFT_FLAGS[@]}"} --show-bin-path)"
+
+# Version: VERSION file (marketing) and the commit count (build number), unless overridden.
+APP_VERSION="${APP_VERSION:-$(tr -d '[:space:]' < "$ROOT/VERSION")}"
+BUILD_NUMBER="${BUILD_NUMBER:-$(git -C "$ROOT" rev-list --count HEAD 2>/dev/null || echo 1)}"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Helpers" "$APP/Contents/Resources"
@@ -35,8 +41,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>NPStoreExtensionID</key><string>${STORE_ID}</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>0.1.0</string>
-  <key>CFBundleVersion</key><string>1</string>
+  <key>CFBundleShortVersionString</key><string>${APP_VERSION}</string>
+  <key>CFBundleVersion</key><string>${BUILD_NUMBER}</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>

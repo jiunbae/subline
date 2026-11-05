@@ -103,3 +103,8 @@
 "Copied" = "Copied";
 "Copy Diagnostics" = "Copy Diagnostics";
 "Troubleshooting" = "Troubleshooting";
+"Playback position" = "Playback position";
+"%@ of %@" = "%@ of %@";
+"Plays from this line" = "Plays from this line";
+"Skip Back 10 Seconds" = "Skip Back 10 Seconds";
+"Skip Forward 10 Seconds" = "Skip Forward 10 Seconds";

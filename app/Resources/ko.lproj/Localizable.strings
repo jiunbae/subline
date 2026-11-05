@@ -103,3 +103,8 @@
 "Copied" = "복사됨";
 "Copy Diagnostics" = "진단 정보 복사";
 "Troubleshooting" = "문제 해결";
+"Playback position" = "재생 위치";
+"%@ of %@" = "%@ / %@";
+"Plays from this line" = "이 줄부터 재생합니다";
+"Skip Back 10 Seconds" = "10초 뒤로";
+"Skip Forward 10 Seconds" = "10초 앞으로";

@@ -65,6 +65,15 @@ struct OverlayRoot: View {
                         .onEnded { _ in controller.dragEnded() }
                 )
                 .onTapGesture(count: 2) { model.command("toggle") }
+                // The transport controls only appear on hover; expose the same actions to VoiceOver here.
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel(model.hasTrack ? "\(model.title), \(model.artist)" : L10n.string("Nothing playing"))
+                .accessibilityValue(model.currentLine ?? "")
+                .accessibilityAction(named: Text(model.isPlaying ? "Pause" : "Play")) { model.command("toggle") }
+                .accessibilityAction(named: Text("Next")) { model.command("next") }
+                .accessibilityAction(named: Text("Previous")) { model.command("prev") }
+                .accessibilityAction(named: Text("Skip Back 10 Seconds")) { model.skip(by: -10) }
+                .accessibilityAction(named: Text("Skip Forward 10 Seconds")) { model.skip(by: 10) }
         }
         .environment(\.colorScheme, .dark)
         .environment(\.overlayStyle, model.style)
@@ -517,6 +526,9 @@ struct LyricsList: View {
                                 .equatable()
                                 .id(i)
                                 .onTapGesture { if synced { model.command("seek", t: cues[i].s) } }
+                                .accessibilityAddTraits(synced ? .isButton : [])
+                                .accessibilityHint(synced ? L10n.string("Plays from this line") : "")
+                                .accessibilityAction { if synced { model.command("seek", t: cues[i].s) } }
                         }
                         Color.clear.frame(height: geo.size.height * 0.55)
                     }
@@ -862,15 +874,15 @@ struct Controls: View {
 
     var body: some View {
         HStack(spacing: compact ? 2 : 4) {
-            button("backward.fill", "prev")
-            button(model.isPlaying ? "pause.fill" : "play.fill", "toggle")
-            button("forward.fill", "next")
+            button("backward.fill", "prev", L10n.string("Previous"))
+            button(model.isPlaying ? "pause.fill" : "play.fill", "toggle", L10n.string(model.isPlaying ? "Pause" : "Play"))
+            button("forward.fill", "next", L10n.string("Next"))
         }
         .padding(.horizontal, 6).padding(.vertical, 3)
         .modifier(ControlsBacking())
     }
 
-    private func button(_ symbol: String, _ action: String) -> some View {
+    private func button(_ symbol: String, _ action: String, _ label: String) -> some View {
         Button { model.command(action) } label: {
             Image(systemName: symbol)
                 .font(.system(size: compact ? 10 : 12, weight: .semibold))
@@ -879,6 +891,8 @@ struct Controls: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(.white.opacity(0.9))
+        .accessibilityLabel(label)
+        .help(label)
     }
 }
 
@@ -902,6 +916,7 @@ struct CaptionPill: View {
         .foregroundStyle(.white.opacity(0.9))
         .modifier(ControlsBacking())
         .help("Caption language")
+        .accessibilityLabel(L10n.string("Caption language"))
     }
 }
 
@@ -922,6 +937,9 @@ private struct ControlsBacking: ViewModifier {
 struct ProgressLine: View {
     let model: PlayerModel
     let duration: Double
+    static func clock(_ t: Double) -> String {
+        let s = max(0, Int(t)); return s >= 3600 ? String(format: "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60) : String(format: "%d:%02d", s / 60, s % 60)
+    }
     var body: some View {
         TimelineView(.periodic(from: .now, by: 0.5)) { _ in
             GeometryReader { g in
@@ -934,6 +952,17 @@ struct ProgressLine: View {
                 .onTapGesture { loc in model.command("seek", t: duration * Double(loc.x / g.size.width)) }
             }
             .frame(height: 3)
+            // VoiceOver: an adjustable slider (swipe up/down seeks ±10 s).
+            .accessibilityElement()
+            .accessibilityLabel(L10n.string("Playback position"))
+            .accessibilityValue(L10n.format("%@ of %@", Self.clock(model.position()), Self.clock(duration)))
+            .accessibilityAdjustableAction { dir in
+                switch dir {
+                case .increment: model.skip(by: 10)
+                case .decrement: model.skip(by: -10)
+                @unknown default: break
+                }
+            }
         }
     }
 }

@@ -37,7 +37,8 @@ final class Diagnostics {
                      "macOS \(ProcessInfo.processInfo.operatingSystemVersionString)",
                      "App: \(Bundle.main.bundlePath)",
                      "Helper: \(helperOK ? "ok" : "MISSING") \(helperPath)",
-                     "Socket: \(socketError ?? "listening at \(NPPaths.socketPath)")"]
+                     "Socket: \(socketError ?? "listening at \(NPPaths.socketPath)")",
+                     "Background cursor: \(BackgroundCursor.enabled ? "on" : "off (public API only)")"]
         if registrations.isEmpty { lines.append("Browsers: none found (Chrome, Chromium, Brave, Edge, Vivaldi, Arc)") }
         for r in registrations { lines.append("Browser \(r.browser): \(r.error.map { "FAILED — \($0)" } ?? "registered") \(r.path)") }
         return lines.joined(separator: "\n")

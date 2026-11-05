@@ -72,6 +72,8 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
             add(model.isPlaying ? "Pause" : "Play", #selector(togglePlay))
             add("Next", #selector(next))
             add("Previous", #selector(prev))
+            add("Skip Back 10 Seconds", #selector(skipBack))
+            add("Skip Forward 10 Seconds", #selector(skipForward))
             menu.addItem(.separator())
         }
 
@@ -302,6 +304,8 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     @objc private func togglePlay() { model.command("toggle") }
     @objc private func next() { model.command("next") }
     @objc private func prev() { model.command("prev") }
+    @objc private func skipBack() { model.skip(by: -10) }
+    @objc private func skipForward() { model.skip(by: 10) }
     @objc func toggleOverlay() { panel.toggle() }
     @objc private func toggleAutoPresence() { panel.autoPresence.toggle() }
     @objc private func openSetup() { model.openSetup?() }

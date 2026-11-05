@@ -240,6 +240,13 @@ final class PlayerModel {
         if action == "toggle" { assign(\.isPlaying, !isPlaying) }
     }
 
+    /// Relative seek (menu, VoiceOver).
+    func skip(by seconds: Double) {
+        guard hasTrack else { return }
+        let t = max(0, position() + seconds)
+        command("seek", t: duration.map { min(t, max(0, $0 - 1)) } ?? t)
+    }
+
     func connectCaptions() {
         guard let k = store.activeKey else { return }
         if let target = preferredTrack(in: store.active?.captionTracks ?? []) {
