@@ -74,7 +74,11 @@
     ccBusy = true;
     const wasOn = button.getAttribute('aria-pressed') === 'true';
     const current = () => { try { return p.getOption('captions', 'track'); } catch { return null; } };
-    const simple = t => t?.languageCode ? {languageCode: t.languageCode, ...(t.kind === 'asr' ? {kind: 'asr'} : {})} : null;
+    // The player's caption state in the plain form setOption accepts, including an active translation
+    // (restored afterwards, so a user's own auto-translate stays on).
+    const simple = t => t?.languageCode ? {languageCode: t.languageCode, ...(t.kind === 'asr' ? {kind: 'asr'} : {}),
+      ...(t.translationLanguage?.languageCode ? {translationLanguage: {languageCode: t.translationLanguage.languageCode}} : {})} : null;
+    const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
     try {
       if (!wasOn) {
         button.click();
@@ -93,7 +97,7 @@
         try { list = p.getOption('captions', 'tracklist') || []; } catch {}
         const base = simple(current()) || simple(list.find(t => t?.kind !== 'asr')) || simple(list[0]);
         if (!base) return;
-        want = {...base, translationLanguage: {languageCode: translateTo}};
+        want = {languageCode: base.languageCode, ...(base.kind ? {kind: base.kind} : {}), translationLanguage: {languageCode: translateTo}};
         isWanted = () => current()?.translationLanguage?.languageCode === translateTo;
       } else {
         want = {languageCode: lang, ...(asr ? {kind: 'asr'} : {})};
@@ -112,7 +116,7 @@
         if (got) post('captions', {videoId: id, ...got}); // re-post in case it raced the app's choice
       }
       if (videoId() !== id || !button.isConnected) return;
-      if (original && (translateTo || original.languageCode !== lang || (original.kind === 'asr') !== asr)) {
+      if (original && !same(simple(current()), original)) {
         try { p.setOption('captions', 'track', original); } catch {}
         await sleep(150);
       }

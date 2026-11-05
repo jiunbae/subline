@@ -154,13 +154,21 @@ async function lyrics(query) {
         if (response.ok) {
           const list = await response.json();
           const norm = value => String(value || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
-          const score = d => (norm(d.trackName) === norm(title) ? 4 : 0) + (norm(d.artistName).includes(norm(artist)) || norm(artist).includes(norm(d.artistName)) ? 2 : 0)
-            - Math.abs(d.duration - query.duration) / 3;
-          const best = (Array.isArray(list) ? list : []).slice(0, 30)
-            .filter(d => d && !d.instrumental && typeof d.syncedLyrics === 'string' && d.syncedLyrics.length < 500000 &&
-              Number.isFinite(d.duration) && Math.abs(d.duration - query.duration) <= 3 && norm(d.trackName).includes(norm(title).slice(0, 12)))
-            .sort((a, b) => score(b) - score(a))[0];
-          if (best) result = {cues:NPParsers.parseLRC(best.syncedLyrics, query.duration)};
+          const t = norm(title), a = norm(artist);
+          // Identity is required, not a bonus: compatible artist AND the same title (or one fully containing
+          // the other, e.g. "Song" vs "Song Remastered"); then exact title and closest length rank higher.
+          const artistOK = d => { const n = norm(d.artistName); return !!n && !!a && (n.includes(a) || a.includes(n)); };
+          const titleOK = d => { const n = norm(d.trackName); return !!n && !!t && (n === t || n.includes(t) || t.includes(n)); };
+          const score = d => (norm(d.trackName) === t ? 4 : 0) - Math.abs(d.duration - query.duration) / 3;
+          const candidates = (Array.isArray(list) ? list : []).slice(0, 30)
+            .filter(d => d && !d.instrumental && typeof d.syncedLyrics === 'string' && d.syncedLyrics.trim() &&
+              d.syncedLyrics.length < 500000 && Number.isFinite(d.duration) && Math.abs(d.duration - query.duration) <= 3 &&
+              artistOK(d) && titleOK(d))
+            .sort((x, y) => score(y) - score(x));
+          for (const d of candidates) {                             // first candidate that actually parses
+            const parsed = NPParsers.parseLRC(d.syncedLyrics, query.duration);
+            if (parsed.length) { result = {cues:parsed}; break; }
+          }
         }
       } catch { /* Search is best effort. */ }
     }

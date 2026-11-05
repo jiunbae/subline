@@ -40,14 +40,20 @@
   // sentence punctuation, at pauses, or when a line gets long.
   const CJK = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/;
   function groupASRWords(events) {
-    const words = [];
+    const words = [], seen = new Set();
     for (const event of events) {
-      if (!event || event.aAppend || !Array.isArray(event.segs) || !Number.isFinite(event.tStartMs)) continue;
+      if (!event || !Array.isArray(event.segs) || !Number.isFinite(event.tStartMs)) continue;
       const end = Number.isFinite(event.dDurationMs) ? (event.tStartMs + event.dDurationMs) / 1000 : undefined;
+      let t = event.tStartMs / 1000;
       for (const seg of event.segs) {
         const text = typeof seg?.utf8 === 'string' ? seg.utf8.replace(/\u200b/g, '') : '';
-        if (!text.trim()) continue;
-        words.push({t: (event.tStartMs + (Number(seg.tOffsetMs) || 0)) / 1000, text, end});
+        // A segment without its own offset belongs to the previous word's time (never back to the event start).
+        if (seg?.tOffsetMs !== undefined && Number.isFinite(Number(seg.tOffsetMs))) t = (event.tStartMs + Number(seg.tOffsetMs)) / 1000;
+        if (!text.trim()) continue;                                   // blank/newline appends only
+        const key = `${t.toFixed(3)}|${text.trim()}`;
+        if (seen.has(key)) continue;                                  // the same timed word repeated by an overlapping window
+        seen.add(key);
+        words.push({t, text, end});
       }
     }
     words.sort((a, b) => a.t - b.t);
@@ -66,6 +72,15 @@
       if (/[.?!。？！…]["'”’)\]]?$/.test(t) || t.length >= max) flush();
     }
     flush();
+    // Start times must strictly advance (the app shows the last cue started); fold equal starts together.
+    for (let i = lines.length - 1; i > 0; i--) {
+      if (lines[i].s <= lines[i - 1].s + 0.05) {
+        lines[i - 1].text += (CJK.test(lines[i].text.trim()[0] || '') ? '' : ' ') + lines[i].text.trim();
+        lines[i - 1].last = Math.max(lines[i - 1].last, lines[i].last);
+        lines[i - 1].end = lines[i].end ?? lines[i - 1].end;
+        lines.splice(i, 1);
+      }
+    }
     return lines.map((l, i) => {
       const next = lines[i + 1]?.s ?? Infinity;
       const e = Math.min(next, Math.max(l.last + 0.9, l.s + 0.6), l.end ?? Infinity);

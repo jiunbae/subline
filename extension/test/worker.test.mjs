@@ -172,3 +172,19 @@ test('LRCLIB search picks the synced entry with matching title and length when g
   assert.equal(search.searchParams.get('track_name'),'Song');
   assert.equal(h.fetches.at(-1).options.credentials,'omit');
 });
+test('LRCLIB search requires artist identity and skips empty candidates',async()=>{
+  const run=async list=>{
+    const h=harness(async url=>new URL(url).pathname==='/api/get' ? {ok:false,status:404,json:async()=>({})} : {ok:true,json:async()=>list});
+    const request={op:'lyrics',query:{title:'Song',artist:'The Band',duration:180}};
+    const sender={id:h.runtime.id,frameId:0,url:'https://music.youtube.com/watch?v=dQw4w9WgXcQ',tab:h.tab};
+    return plain(await new Promise(resolve=>h.runtime.onMessage.callbacks[0](request,sender,resolve))).cues.map(c=>c.text);
+  };
+  assert.deepEqual(await run([
+    {trackName:'Song',artistName:'Unrelated Artist',duration:180,syncedLyrics:'[00:01]wrong'},
+    {trackName:'Song (Album version)',artistName:'The Band',duration:180,syncedLyrics:'[00:01]album'}]),['album']);
+  assert.deepEqual(await run([
+    {trackName:'Song',artistName:'The Band',duration:180,syncedLyrics:''},
+    {trackName:'Song',artistName:'The Band',duration:180,syncedLyrics:'no timestamps'},
+    {trackName:'Song',artistName:'The Band',duration:181,syncedLyrics:'[00:03]valid'}]),['valid']);
+  assert.deepEqual(await run([{trackName:'Completely Different',artistName:'The Band',duration:180,syncedLyrics:'[00:01]x'}]),[]);
+});

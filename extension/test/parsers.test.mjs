@@ -68,3 +68,19 @@ test('ASR lines split when they get long and keep short fragments joined over sh
   const frag = parseJSON3({events:[{tStartMs:0, dDurationMs:9000, segs:[{utf8:'知る'}, {utf8:'戻れないよ', tOffsetMs:2000}]}]}, true);
   assert.deepEqual(frag.map(c => c.text), ['知る戻れないよ']);
 });
+test('ASR regroup keeps textual appends, drops repeated windows, and never yields equal starts', () => {
+  const appended = parseJSON3({events:[
+    {tStartMs:0, dDurationMs:3000, segs:[{utf8:'Hello', tOffsetMs:0}]},
+    {tStartMs:500, dDurationMs:2500, aAppend:1, segs:[{utf8:' world.'}]},
+  ]}, true);
+  assert.deepEqual(appended.map(c => c.text), ['Hello world.']);
+  const repeated = parseJSON3({events:[
+    {tStartMs:0, dDurationMs:3000, segs:[{utf8:'Hello', tOffsetMs:0}, {utf8:' world.', tOffsetMs:400}]},
+    {tStartMs:0, dDurationMs:3000, segs:[{utf8:'Hello', tOffsetMs:0}, {utf8:' world.', tOffsetMs:400}]},
+  ]}, true);
+  assert.deepEqual(repeated.map(c => c.text), ['Hello world.']);
+  const untimed = parseJSON3({events:[{tStartMs:0, dDurationMs:6000, segs:[
+    {utf8:'First sentence.', tOffsetMs:0}, {utf8:' Second sentence.'}, {utf8:' Third sentence.'}]}]}, true);
+  assert.equal(new Set(untimed.map(c => c.s)).size, untimed.length);
+  assert.ok(untimed.map(c => c.text).join(' ').includes('Second sentence.'));
+});
