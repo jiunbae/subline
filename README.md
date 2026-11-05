@@ -102,10 +102,12 @@ Measured on Apple Silicon, release build, with simulated input:
 
 | | Result | Target |
 |---|---|---|
-| App / host memory footprint (`footprint`, not RSS) | 29 MB / 2.4 MB (after 70 s of soak; stable) | ≤ 80 MB |
-| CPU, idle / playing with no text | ~0% / ~0.03% | ≤ 0.2% |
-| CPU, lyric pace (a line every 3 s): Lyrics / Cover + Line | ~1.2% / ~1.2% | ≤ 1% (about at target) |
-| CPU, fast auto-generated captions (1500 lines, every 1.3 s): Lyrics / Cover + Line | ~0.7% / ~1.0% (was 13% / 4.1%) | ≤ 1% |
+| App / host memory footprint (`footprint`, not RSS) | 25–29 MB / 2.4 MB | ≤ 80 MB |
+| CPU, idle / playing with no text | ~0.03% / ~0.03–0.1% | ≤ 0.2% |
+| CPU, lyric pace (a line every 3 s): Lyrics / Cover + Line | ~1.1% / ~1.0% | ≤ 1% (at target) |
+| CPU, fast auto-generated captions (1500 lines, every 1.3 s): Lyrics / Cover + Line | ~1.0% / ~1.1% (was 13% / 4.1%) | ≤ 1% |
+| YouTube tab main thread, with vs without the extension (40 s playing) | 2.5–2.8% vs 2.5–3.3% (no measurable difference) | |
+| App ↔ extension messages while playing | 1 clock per 5 s (+ events); a fixed feedback loop had reached ~1,500/s | |
 
 Almost all playing cost is animation frames, which SwiftUI renders text for on the CPU. Rules that came out of
 the measurements: no implicit animation on every lyric row (it was ~90% of the Lyrics cost); when lines change

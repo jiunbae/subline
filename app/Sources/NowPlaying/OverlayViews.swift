@@ -314,7 +314,8 @@ struct TextStatusChip: View {
     var body: some View {
         switch model.textStatus {
         case .loading:
-            chip { HStack(spacing: 5) { ProgressView().controlSize(.mini); Text("Loading captions…") } }
+            // Static glyph, not a ProgressView: a spinning indicator redraws every frame for the whole wait.
+            chip { Label("Loading captions…", systemImage: "ellipsis.bubble") }
         case .available:
             Button { model.connectCaptions() } label: { chip { Label("Load captions", systemImage: "captions.bubble") } }
                 .buttonStyle(.plain)
