@@ -57,7 +57,20 @@ final class OverlayHostingView<Content: View>: NSHostingView<Content> {
         addTrackingArea(a)
         area = a
     }
-    override func mouseEntered(with event: NSEvent) { super.mouseEntered(with: event); onHover?(true) }
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        onHover?(true)
+        // The hover controls fade in right after entering and SwiftUI resets the cursor while they
+        // appear; re-apply ours once they're in (entering straight onto an edge is the common case).
+        for delay in [0.05, 0.25] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard let self, !self.resizing else { return }
+                let e = self.edgesUnderMouse()
+                self.cursorEdges = []      // force: the system cursor may no longer be ours
+                self.applyCursor(e)
+            }
+        }
+    }
     override func mouseExited(with event: NSEvent) {
         super.mouseExited(with: event)
         if !resizing { applyCursor([]) }
@@ -414,15 +427,19 @@ final class PanelController {
 
     // MARK: Snapping & persistence
 
+    /// The screen containing the frame's center, else the nearest one: a window dragged past the
+    /// outer edge of a display stays on that display instead of jumping to the main screen.
     private func screenFor(_ f: NSRect) -> NSScreen {
         let c = NSPoint(x: f.midX, y: f.midY)
-        return NSScreen.screens.first { $0.frame.contains(c) } ?? NSScreen.main ?? NSScreen.screens[0]
+        if let s = NSScreen.screens.first(where: { $0.frame.contains(c) }) { return s }
+        func distance(_ r: NSRect) -> CGFloat {
+            let dx = max(r.minX - c.x, 0, c.x - r.maxX), dy = max(r.minY - c.y, 0, c.y - r.maxY)
+            return dx * dx + dy * dy
+        }
+        return NSScreen.screens.min { distance($0.frame) < distance($1.frame) } ?? NSScreen.screens[0]
     }
 
-    private var screen: NSScreen {
-        let c = NSPoint(x: panel.frame.midX, y: panel.frame.midY)
-        return NSScreen.screens.first { $0.frame.contains(c) } ?? panel.screen ?? NSScreen.main ?? NSScreen.screens[0]
-    }
+    private var screen: NSScreen { screenFor(panel.frame) }
 
     /// Where the overlay may sit: the whole screen below the menu bar. Unlike `visibleFrame` this
     /// includes the Dock area, so a PiP can be parked over (or below the level of) the Dock.
@@ -470,8 +487,7 @@ final class PanelController {
     }
 
     private func clampToScreen(animate: Bool) {
-        let scr = NSScreen.screens.first { $0.frame.intersects(panel.frame) } ?? NSScreen.main ?? NSScreen.screens[0]
-        let f = clamp(panel.frame, to: Self.movableFrame(scr))
+        let f = clamp(panel.frame, to: Self.movableFrame(screenFor(panel.frame)))
         if f != panel.frame { panel.setFrame(f, display: true, animate: animate) }
     }
 

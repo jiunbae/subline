@@ -56,6 +56,17 @@ After you quit from the menu, it won't be relaunched automatically until you ope
 | No text | Cover + Line shows the title larger instead of an empty slot, with a status chip: Loading captions… / Load captions / Show lyrics (unsynced) |
 | Lyrics on YouTube Music | Synced lyrics from LRCLIB (retried with localized/`(Official Audio)` suffixes removed). Otherwise YTM's own lyrics, unsynced (Lyrics layout only) |
 
+## Verification tools
+
+| Script | What it checks |
+|---|---|
+| `scripts/perf/cpu.sh [fast\|lyrics\|nocues] [layout] [style]` | CPU and memory for a fixed synthetic replay (stable, unlike a live tab) |
+| `scripts/perf/feed.py MODE SECONDS` | Feeds synthetic states to the app: `lyrics`, `fast`, `none`, `loading`, `gap`, `dual`, `paused` |
+| `scripts/ui/run.sh` | Real pointer input: resize from all 8 handles (cursor + which edges move), Dock placement, context menu |
+| `node scripts/e2e/youtube.mjs <url> [secs] [--cc-off]` | Real YouTube in Chromium with the unpacked extension; prints the app's state (needs `debugDump`) |
+
+`scripts/ui` and `scripts/e2e` move the real pointer / open a browser; they close what they open.
+
 ## Tests
 
 ```bash

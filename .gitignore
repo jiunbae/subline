@@ -3,3 +3,4 @@ keys/*.pem
 build/
 *.xcuserstate
 .DS_Store
+node_modules/
