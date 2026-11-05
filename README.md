@@ -64,7 +64,7 @@ After you quit from the menu, it won't be relaunched automatically until you ope
 
 - **Install:** unzip `NowPlaying-<version>.zip` (made by `scripts/package-app.sh`) and move `NowPlaying.app` to
   `/Applications` or `~/Applications`, open it once, then add the extension (setup window). Universal app (Apple Silicon
-  and Intel), macOS 14 or later; tested on Apple Silicon.
+  and Intel), macOS 14 or later; tested on Apple Silicon, and the Intel build under Rosetta (app + helper).
 - **Update:** quit from the menu bar, replace the app, open it again. Opening the app re-registers it with every
   browser, so moving or replacing it is safe; if a browser can't reach it, open the app (or Setup → Troubleshooting → Retry).
   An unpacked extension must be reloaded on the browser's Extensions page; the menu shows when it's outdated.

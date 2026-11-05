@@ -427,7 +427,9 @@ final class PanelController {
             f = panel.frame // keep the cover square and the size limits exact
         }
         f = clamp(f, to: Self.movableFrame(screen))
-        if f != panel.frame { panel.setFrame(f, display: true, animate: true) }
+        // Instant, not animated: during an animated frame change the tracking areas are in flux, and a
+        // pointer that immediately re-grabs an edge could miss it (start a move) or keep a stale cursor.
+        if f != panel.frame { panel.setFrame(f, display: true, animate: false) }
         panel.invalidateShadow()
         saveFrame(f)
     }
