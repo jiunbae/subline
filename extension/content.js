@@ -112,8 +112,8 @@
         return;
       }
       if (result?.cues?.length) emitCues({type:'cues', videoId:id, source:'lrclib', kind:'lyrics', synced:true, cues:result.cues});
-      else askMain('lyrics', {videoId:id}); // YTM's own (usually unsynced) lyrics as the last resort
-    } catch { if (epoch === generation && track?.videoId === id && !cues?.cues?.length) askMain('lyrics', {videoId:id}); }
+      // No match: the track simply has no synced lyrics (the empty cue set was already sent).
+    } catch { /* worker unavailable: nothing to show */ }
   }
   function captionTrackList() {
     const list = !music && track && main?.videoId === track.videoId ? main.data?.captionTracks : null;
@@ -201,11 +201,6 @@
     if (m.kind === 'captions' && normalized.length) emitCues({type:'cues', videoId:track.videoId,
       source:'yt-captions', lang:typeof m.lang === 'string' ? m.lang.slice(0,40) : '', trackId:key,
       kind:m.trackKind === 'asr' ? 'asr' : 'manual', synced:true, cues:normalized});
-    if (m.kind === 'lyrics') {
-      clearTimeout(lyricTimer);
-      if (normalized.length && !cues?.cues?.length) emitCues({type:'cues', videoId:track.videoId, source:'ytm-lyrics',
-        kind:'lyrics', synced:m.synced !== false, cues:normalized});
-    }
   });
   chrome.runtime.onMessage.addListener((message, sender, respond) => {
     if (sender.id !== chrome.runtime.id) return;

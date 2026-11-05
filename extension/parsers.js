@@ -127,23 +127,5 @@
     });
     return result;
   }
-  function parseTimedLyrics(data) {
-    const rows = [];
-    let visited = 0;
-    function walk(value, depth = 0) {
-      if (!value || typeof value !== 'object' || depth > 25 || ++visited > 30000) return;
-      if (Array.isArray(value.timedLyricsData)) {
-        for (const line of value.timedLyricsData) {
-          if (line.cueRange?.startTimeMilliseconds === undefined) continue;
-          rows.push({s: Number(line.cueRange.startTimeMilliseconds) / 1000,
-            e: Number(line.cueRange.endTimeMilliseconds) / 1000, text: line.lyricLine});
-        }
-        return;
-      }
-      for (const child of Object.values(value)) walk(child, depth + 1);
-    }
-    walk(data);
-    return normalizeCues(rows);
-  }
-  globalThis.NPParsers = Object.freeze({normalizeCues, parseJSON3, parseLRC, parseTimedLyrics});
+  globalThis.NPParsers = Object.freeze({normalizeCues, parseJSON3, parseLRC});
 })();

@@ -226,3 +226,15 @@ test('transient LRCLIB failures are not cached and are reported as transient',as
   await ask();
   assert.ok(calls>first,'a transient failure must not be served from the cache');
 });
+test('least privilege: https-only hosts, no cookie or internal-API access in shipped scripts',()=>{
+  const m=JSON.parse(source('manifest.json'));
+  assert.deepEqual(m.permissions,['nativeMessaging','alarms']);
+  assert.ok([...m.host_permissions,...m.content_scripts.flatMap(c=>c.matches)].every(p=>p.startsWith('https://')));
+  for (const f of ['bridge.js','content.js','adapters.js','parsers.js','service-worker.js']) {
+    const s=source(f);
+    assert.ok(!/document\.cookie|SAPISID|youtubei\/v1|Authorization/.test(s), `${f} must not touch cookies, auth headers or internal APIs`);
+  }
+  const h=harness(); const count=h.messages.length;
+  h.runtime.onMessage.callbacks[0]({op:'publish',message:track},{id:h.runtime.id,frameId:0,url:'http://www.youtube.com/watch?v=dQw4w9WgXcQ',tab:h.tab},()=>{});
+  assert.equal(h.messages.length,count); // plain-http pages are ignored
+});

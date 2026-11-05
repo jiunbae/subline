@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import '../parsers.js';
-const {parseJSON3, normalizeCues, parseLRC, parseTimedLyrics} = globalThis.NPParsers;
+const {parseJSON3, normalizeCues, parseLRC} = globalThis.NPParsers;
 
 test('JSON3 converts milliseconds, joins segments and preserves line breaks', () => {
   assert.deepEqual(parseJSON3({events:[{tStartMs:1000,dDurationMs:2500,segs:[{utf8:'Hello '},{utf8:'world\nagain'}]},
@@ -38,12 +38,6 @@ test('LRC applies millisecond offset, clamps negatives, ignores malformed timest
   assert.deepEqual(parseLRC('[offset:-500]\n[00:00.20]First\n[00:70]bad\n[00:02:5]Second',5),
     [{s:0,e:2,text:'First'},{s:2,e:5,text:'Second'}]);
   assert.deepEqual(parseLRC('plain lyrics without timestamps'), []);
-});
-test('mobile timedLyrics nested renderer converts string millisecond values', () => {
-  assert.deepEqual(parseTimedLyrics({contents:{timedLyricsRenderer:{timedLyricsData:[
-    {lyricLine:'A',cueRange:{startTimeMilliseconds:'1200',endTimeMilliseconds:'2400'}},
-    {lyricLine:'no timing'}]}}}), [{s:1.2,e:2.4,text:'A'}]);
-  assert.deepEqual(parseTimedLyrics({lyrics:'unsynced'}), []);
 });
 test('ASR word stream is regrouped into sentences instead of YouTube rolling windows', () => {
   const words = (start, list) => ({tStartMs:start, dDurationMs:9000, wWinId:1,

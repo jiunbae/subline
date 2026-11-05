@@ -10,7 +10,7 @@ show what you are playing on YouTube or YouTube Music in a floating window on yo
 | Data | Where it goes | Why |
 |---|---|---|
 | Title, artist, album, duration, thumbnail URL, play/pause state and position of the video or track in your YouTube / YouTube Music tab | The Now Playing app on **your own Mac**, through Chrome Native Messaging. It is never sent to the developer or any server. | To display it in the overlay |
-| Captions the YouTube player downloads for the current video, and YouTube Music lyrics | The Now Playing app on your Mac | To show time-synced text |
+| Captions the YouTube player downloads for the current video | The Now Playing app on your Mac | To show time-synced text |
 | Title, artist, album and duration of the current song | **lrclib.net**, a public lyrics database ([lrclib.net](https://lrclib.net)), without cookies — only while the Now Playing app is connected | To find time-synced lyrics |
 | Thumbnail images | Downloaded by the app directly from YouTube's image servers (`i.ytimg.com` and related hosts) | To show artwork |
 
@@ -20,8 +20,9 @@ show what you are playing on YouTube or YouTube Music in a floating window on yo
 - No browsing history is read. The extension runs only on `www.youtube.com` and `music.youtube.com`.
 - It never runs in incognito/private windows (the extension declares `incognito: not_allowed`).
 - Without the Now Playing app connected, it sends nothing anywhere.
-- Your YouTube session is never read by the extension's background code and never leaves the page.
-  For YouTube Music lyrics the extension makes the same same-origin request the page itself makes.
+- The extension never reads your cookies or YouTube session and never calls YouTube's internal APIs.
+  It only reads the captions the YouTube player itself downloads, and switches the player's caption
+  track when you choose a language (restoring your own setting afterwards).
 - No data is sold or shared, and none is used for anything except the features above.
 
 ## Storage

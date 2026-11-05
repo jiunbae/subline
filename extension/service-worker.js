@@ -1,7 +1,7 @@
 'use strict';
 importScripts('parsers.js');
 const HOST = 'com.nowplaying.host';
-const MATCH = ['*://www.youtube.com/*', '*://music.youtube.com/*'];
+const MATCH = ['https://www.youtube.com/*', 'https://music.youtube.com/*'];
 const states = new Map(), sequences = new Map(), lyricCache = new Map(), inflight = new Map();
 let port = null, retry = null, backoff = 1000, visible = true;
 // True once the native app answered on this connection: external lookups (LRCLIB) only run for a
@@ -16,7 +16,7 @@ function nextSeq(tabId) {
   sequences.set(tabId, seq); return seq;
 }
 function allowed(url) {
-  try { const u = new URL(url); return ['http:','https:'].includes(u.protocol) && ['www.youtube.com','music.youtube.com'].includes(u.hostname); }
+  try { const u = new URL(url); return u.protocol === 'https:' && ['www.youtube.com','music.youtube.com'].includes(u.hostname); }
   catch { return false; }
 }
 function nativeSend(tabId, message) {

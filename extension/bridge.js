@@ -1,4 +1,6 @@
-/* Runs in YouTube's MAIN world. Never posts request URLs, tokens or cookies. */
+/* Runs in YouTube's MAIN world. Never reads cookies, never calls YouTube's internal APIs, never posts
+   request URLs or tokens: it only observes the caption responses the player itself downloads and
+   drives the player's public caption options. */
 (() => {
   'use strict';
   if (window.__nowPlayingBridge) return;
@@ -10,7 +12,7 @@
   const describe = t => t?.languageCode ? t.languageCode + (t.kind === 'asr' ? ':asr' : '') +
     (t.translationLanguage?.languageCode ? '→' + t.translationLanguage.languageCode : '') + (t.vss_id ? '[listed]' : '') : String(t);
   const originalFetch = window.fetch;
-  let lyricsBrowse = null, lyricsVideo = '', ccBusy = false;
+  let ccBusy = false;
   const videoId = () => new URL(location.href).searchParams.get('v') ||
     document.querySelector('#movie_player')?.getVideoData?.()?.video_id || '';
   const post = (kind, payload) => window.postMessage({channel: CHANNEL, direction: 'from-main', kind, ...payload}, location.origin);
@@ -161,13 +163,6 @@
       if (!wasOn && button.getAttribute('aria-pressed') === 'true') button.click();
     } finally { ccBusy = false; }
   }
-  function discoverBrowse(value, id, depth = 0, budget = {n: 0}) {
-    if (!value || typeof value !== 'object' || depth > 24 || ++budget.n > 25000) return;
-    if (typeof value.browseId === 'string' && value.browseId.startsWith('MPLYt')) {
-      lyricsBrowse = value.browseId; lyricsVideo = id; return;
-    }
-    for (const child of Object.values(value)) discoverBrowse(child, id, depth + 1, budget);
-  }
   function parseXML(text, asr) {
     const xml = new DOMParser().parseFromString(text, 'text/xml');
     const rows = [...xml.querySelectorAll('text, p')].map(node => {
@@ -233,53 +228,6 @@
     }, {once: true});
     return originalSend.apply(this, args);
   };
-  // Same auth the YTM web client attaches to its own youtubei calls; computed and used only in-page.
-  async function authHeaders() {
-    const sapisid = document.cookie.split('; ').map(c => c.split('=')).find(([k]) => k === 'SAPISID' || k === '__Secure-3PAPISID')?.[1];
-    if (!sapisid) return {};
-    const ts = Math.floor(Date.now() / 1000);
-    const digest = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(`${ts} ${sapisid} ${location.origin}`));
-    const hex = [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
-    return {'Authorization': `SAPISIDHASH ${ts}_${hex}`, 'X-Goog-AuthUser': String(window.ytcfg?.get?.('SESSION_INDEX') ?? 0), 'X-Origin': location.origin};
-  }
-  function plainLyrics(json) {
-    let text = '';
-    (function walk(v, d) {
-      if (text || !v || typeof v !== 'object' || d > 20) return;
-      const runs = v.musicDescriptionShelfRenderer?.description?.runs;
-      if (Array.isArray(runs)) { text = runs.map(r => r?.text || '').join(''); return; }
-      for (const c of Object.values(v)) walk(c, d + 1);
-    })(json, 0);
-    return text.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 2000).map((line, i) => ({s: i, text: line}));
-  }
-  async function getLyrics(id) {
-    if (location.hostname !== 'music.youtube.com' || id !== videoId()) return;
-    try {
-      const base = window.ytcfg?.get?.('INNERTUBE_CONTEXT');
-      if (!base) throw new Error('No context');
-      const request = async (endpoint, body) => {
-        const response = await originalFetch.call(window, `/youtubei/v1/${endpoint}?prettyPrint=false`, {
-          method: 'POST', credentials: 'same-origin', signal: AbortSignal.timeout(7000),
-          headers: {'Content-Type': 'application/json', ...await authHeaders()},
-          body: JSON.stringify({context: structuredClone(base), ...body})
-        });
-        if (!response.ok) throw new Error('Unavailable');
-        return response.json();
-      };
-      if (lyricsVideo !== id || !lyricsBrowse) {
-        lyricsBrowse = null;
-        const next = await request('next', {videoId: id});
-        if (id !== videoId()) return;
-        discoverBrowse(next, id);
-      }
-      if (lyricsVideo !== id || !lyricsBrowse) throw new Error('No lyrics');
-      const json = await request('browse', {browseId: lyricsBrowse});
-      if (id !== videoId()) return;
-      const timed = NPParsers.parseTimedLyrics(json);
-      if (timed.length) post('lyrics', {videoId: id, cues: timed, synced: true});
-      else post('lyrics', {videoId: id, cues: plainLyrics(json), synced: false});
-    } catch { if (id === videoId()) post('lyrics', {videoId: id, cues: []}); }
-  }
   async function connectCaptions() {
     if (ccBusy) return;
     const button = document.querySelector('.ytp-subtitles-button');
@@ -303,7 +251,6 @@
     const m = event.data;
     if (event.source !== window || event.origin !== location.origin || m?.channel !== CHANNEL || m.direction !== 'to-main') return;
     if (m.kind === 'metadata') metadata();
-    if (m.kind === 'lyrics' && typeof m.videoId === 'string') void getLyrics(m.videoId);
     // Commands name the video they were issued for; queued work for a video we already left is dropped
     // before it touches the player (SPA navigation can happen while an earlier command runs).
     const forCurrent = fn => (...args) => (typeof m.videoId !== 'string' || m.videoId === videoId()) ? fn(...args) : undefined;

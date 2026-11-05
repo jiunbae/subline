@@ -71,8 +71,8 @@ macOS용 Now Playing 앱(macOS 14 이상, Apple Silicon·Intel 공용)이 있어
 |---|---|
 | `nativeMessaging` | Sends playback state, artwork URLs and captions/lyrics to the user's locally installed Now Playing macOS app, and receives playback commands from it. This is the extension's only output. |
 | `alarms` | Schedules a reconnect to the local Now Playing app after it restarts or is launched later, without keeping the service worker alive. |
-| Host `www.youtube.com`, `music.youtube.com` | Reads the current video/track (title, artist, artwork, position) and the captions the YouTube player itself downloads, and performs play/pause/seek/next/previous on the user's request. |
-| Host `lrclib.net` | Looks up time-synced lyrics for the current song (title, artist, album, length) when YouTube Music doesn't provide synced lyrics — only while the companion app is connected. |
+| Host `https://www.youtube.com`, `https://music.youtube.com` | Reads the current video/track (title, artist, artwork, position) and the captions the YouTube player itself downloads, switches the player's caption track when the user picks a language, and performs play/pause/seek/next/previous on the user's request. No cookies are read and no requests are made to YouTube. |
+| Host `https://lrclib.net` | Looks up time-synced lyrics for the current song (title, artist, album, length) when YouTube Music doesn't provide synced lyrics — only while the companion app is connected. |
 
 **Remote code:** No, I am not using remote code. All JavaScript is in the package.
 
@@ -80,7 +80,7 @@ macOS용 Now Playing 앱(macOS 14 이상, Apple Silicon·Intel 공용)이 있어
 
 - ☑ **Website content**. Track title, artist, album, duration and captions/lyrics of the playing video are sent to the user's own Now Playing app on the same Mac. Title, artist, album and duration are also sent to lrclib.net to look up lyrics.
 - ☐ Everything else (personally identifiable info, health, financial, authentication, personal communications, location, web history, user activity) stays **unchecked**.
-  - The extension never sends the YouTube session anywhere. For YouTube Music lyrics it makes the same same-origin request the page makes, signed in-page with the page's own session. The session stays in the page and is never read by the extension's service worker.
+  - The extension never reads cookies or the YouTube session and makes no requests to YouTube itself; it only observes the caption files the YouTube player downloads.
 
 Certify all three:
 - I do not sell or transfer user data to third parties, outside of the approved use cases.

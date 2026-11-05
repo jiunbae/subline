@@ -69,7 +69,7 @@ macOS 화면 위에 PiP처럼 떠 있는 **네이티브 패널**로 보여주는
 | 어댑터 | 방법 | 비고 |
 |---|---|---|
 | **YT 자막** | `document_start`에 MAIN-world에서 fetch/XHR을 후킹해 플레이어가 받은 `/api/timedtext` **응답 자체**를 복제하고 정규화합니다. PerformanceObserver는 URL 발견용 보조로만 씁니다. 필요하면 pot 포함 URL을 `fmt=json3`로 재요청합니다. | PoToken 때문에 직접 요청하면 빈 응답이나 429가 옵니다. pot을 자체 생성(bgutils)하지 **않습니다**. |
-| **YTM 가사** | LRCLIB synced 가사를 먼저 쓰고, 없으면 YTM 웹의 무타임스탬프 가사를 표시합니다 | 2026-11 로그인 세션 검증: YTM 웹은 무타임스탬프 가사만 주고, 모바일 client(ANDROID_MUSIC) 경로는 timedLyricsData 없이 약 430KB를 돌려주어 폐기했습니다 |
+| **YTM 가사** | LRCLIB synced 가사만 씁니다(정확 조회 → 검색 1회) | 2026-11: YTM 웹은 무타임스탬프 가사만 주고 모바일 client 경로는 폐기. 웹 스토어 심사 위험(쿠키·내부 API) 때문에 YTM 자체 가사 대체 경로도 제거 |
 | **화면 캡션 DOM** | 현재 표시 중인 캡션 DOM을 관찰합니다 | 위 방법이 실패할 때 쓰는 강등 경로입니다 |
 | **LRCLIB** | 음악 트랙에서 사용자가 선택했을 때만 synced lyrics를 가져옵니다. 제목/아티스트/길이를 대조하고 오프셋을 조절할 수 있게 합니다 | 커버·라이브 버전 오매칭에 주의해야 합니다 |
 
