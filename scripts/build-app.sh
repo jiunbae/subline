@@ -49,10 +49,13 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>NSSupportsAutomaticGraphicsSwitching</key><true/>
 </dict></plist>
 PLIST
-# Ad-hoc sign (use a Developer ID identity + notarization for distribution).
+# Ad-hoc sign by default. For distribution set CODESIGN_IDENTITY to a Developer ID identity
+# (scripts/package-app.sh then notarizes); notarization needs a secure timestamp.
 IDENTITY="${CODESIGN_IDENTITY:--}"
-codesign --force --options runtime --sign "$IDENTITY" "$APP/Contents/Helpers/np-host"
-codesign --force --options runtime --sign "$IDENTITY" "$APP"
+SIGN_FLAGS=(--force --options runtime --sign "$IDENTITY")
+[[ "$IDENTITY" != "-" ]] && SIGN_FLAGS+=(--timestamp)
+codesign "${SIGN_FLAGS[@]}" "$APP/Contents/Helpers/np-host"
+codesign "${SIGN_FLAGS[@]}" "$APP"
 echo "built $APP"
 
 if [[ "${1:-}" == "--install" ]]; then

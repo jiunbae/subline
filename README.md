@@ -72,7 +72,9 @@ After you quit from the menu, it won't be relaunched automatically until you ope
   registrations, Chrome install requests, `~/Library/Application Support/NowPlaying` (recently played, thumbnails,
   extension copy, debug dump) and the preferences. Then remove the extension in the browser.
 - **Versions:** `VERSION` (marketing version) and the git commit count (build number) are stamped by `scripts/build-app.sh`.
-- **Signing:** builds are ad-hoc signed. For other people's Macs, set `CODESIGN_IDENTITY` to a Developer ID and notarize the zip.
+- **Signing:** local builds are ad-hoc signed. For other people's Macs, `scripts/package-app.sh` signs with a Developer ID,
+  notarizes, staples and zips when given `CODESIGN_IDENTITY` and notary credentials (`NOTARY_PROFILE`, or
+  `NOTARY_KEY`/`NOTARY_KEY_ID`/`NOTARY_ISSUER` for an App Store Connect API key). See the script header.
 
 ## Language
 
