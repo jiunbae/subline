@@ -4,3 +4,7 @@ build/
 *.xcuserstate
 .DS_Store
 node_modules/
+keys/*.p8
+keys/*.p12
+*.p8
+*.p12
