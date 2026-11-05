@@ -201,3 +201,28 @@ test('no external lyric lookup before the companion app has answered, and incogn
   assert.equal(h.messages.length,count);
   assert.equal(JSON.parse(source('manifest.json')).incognito,'not_allowed');
 });
+test('reconnect replays tabs in playback-activation order (last started is replayed last)',async()=>{
+  const h=harness(); await flush();
+  const tabA={id:7,url:'https://www.youtube.com/watch?v=aaaaaaaaaaa'}, tabB={id:8,url:'https://www.youtube.com/watch?v=bbbbbbbbbbb'};
+  h.tabs.query=async()=>[tabA,tabB];
+  const pub=(tab,msg)=>h.runtime.onMessage.callbacks[0]({op:'publish',message:msg},{id:h.runtime.id,frameId:0,url:tab.url,tab},()=>{});
+  const tr=v=>({...track,videoId:v}), clk=(v,paused)=>({type:'clock',videoId:v,t:1,rate:1,paused,buffering:false});
+  pub(tabB,tr('bbbbbbbbbbb')); pub(tabA,tr('aaaaaaaaaaa'));
+  pub(tabA,clk('aaaaaaaaaaa',false));            // A started first …
+  await new Promise(r=>setTimeout(r,5));
+  pub(tabB,clk('bbbbbbbbbbb',false));            // … then B: B is the one to follow
+  h.ports[0].onDisconnect.callbacks[0](); h.timers[0].fn(); await flush();
+  const clocks=h.messages.filter(m=>m.type==='clock').slice(-2).map(m=>m.tabId);
+  assert.deepEqual(clocks,[7,8]);
+});
+test('transient LRCLIB failures are not cached and are reported as transient',async()=>{
+  let calls=0;
+  const h=harness(async()=>{ calls++; return {ok:false,status:503,json:async()=>({})}; }); ready(h);
+  const request={op:'lyrics',query:{title:'Song',artist:'Band',duration:100}};
+  const sender={id:h.runtime.id,frameId:0,url:'https://music.youtube.com/watch?v=dQw4w9WgXcQ',tab:h.tab};
+  const ask=()=>new Promise(resolve=>h.runtime.onMessage.callbacks[0](request,sender,resolve));
+  assert.deepEqual(plain(await ask()),{cues:[],transient:true});
+  const first=calls;
+  await ask();
+  assert.ok(calls>first,'a transient failure must not be served from the cache');
+});

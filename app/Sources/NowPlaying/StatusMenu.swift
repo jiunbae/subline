@@ -220,12 +220,13 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     }
 
     /// "Auto-translate ▸" submenu: the user's system languages first, then everything YouTube offers.
-    private func addTranslations(to m: NSMenu, current: String?, action: Selector) {
-        guard !model.translations.isEmpty else { return }
+    private func addTranslations(to m: NSMenu, current: String?, action: Selector, excluding: String? = nil) {
+        let translations = model.translations.filter { $0.id != excluding }
+        guard !translations.isEmpty else { return }
         let item = NSMenuItem(title: L10n.string("Auto-translate"), action: nil, keyEquivalent: "")
         let sub = NSMenu(); sub.autoenablesItems = false
         let preferred = Locale.preferredLanguages.compactMap { Locale(identifier: $0).language.languageCode?.identifier }
-        let top = preferred.compactMap { code in model.translations.first { $0.lang == code || $0.lang.hasPrefix(code + "-") } }
+        let top = preferred.compactMap { code in translations.first { $0.lang == code || $0.lang.hasPrefix(code + "-") } }
         func add(_ t: CaptionTrack) {
             let i = NSMenuItem(title: Self.fit(t.name), action: action, keyEquivalent: "")
             i.target = self; i.representedObject = t.id
@@ -235,7 +236,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         var seen = Set<String>()
         for t in top where seen.insert(t.id).inserted { add(t) }
         if !seen.isEmpty { sub.addItem(.separator()) }
-        for t in model.translations where !seen.contains(t.id) { add(t) }
+        for t in translations where !seen.contains(t.id) { add(t) }
         item.submenu = sub
         if current?.hasPrefix("x-") == true { item.state = .on }
         m.addItem(item)
@@ -256,7 +257,8 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
             i.state = model.secondaryTrackID == t.id ? .on : .off
             m.addItem(i)
         }
-        addTranslations(to: m, current: model.secondaryTrackID, action: #selector(pickSecondary(_:)))
+        addTranslations(to: m, current: model.secondaryTrackID, action: #selector(pickSecondary(_:)),
+                        excluding: model.captionTrackID)
     }
 
     @objc private func resumeRecent(_ s: NSMenuItem) {

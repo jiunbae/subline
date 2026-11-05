@@ -263,7 +263,10 @@
     if (event.source !== window || event.origin !== location.origin || m?.channel !== CHANNEL || m.direction !== 'to-main') return;
     if (m.kind === 'metadata') metadata();
     if (m.kind === 'lyrics' && typeof m.videoId === 'string') void getLyrics(m.videoId);
-    if (m.kind === 'connectCaptions') void queued(connectCaptions)();
-    if (m.kind === 'selectCaptions' && typeof m.trackId === 'string' && /^[A-Za-z0-9_-]{1,24}(:asr)?$/.test(m.trackId)) void queued(selectCaptionsNow)(m.trackId);
+    // Commands name the video they were issued for; queued work for a video we already left is dropped
+    // before it touches the player (SPA navigation can happen while an earlier command runs).
+    const forCurrent = fn => (...args) => (typeof m.videoId !== 'string' || m.videoId === videoId()) ? fn(...args) : undefined;
+    if (m.kind === 'connectCaptions') void queued(forCurrent(connectCaptions))();
+    if (m.kind === 'selectCaptions' && typeof m.trackId === 'string' && /^[A-Za-z0-9_-]{1,24}(:asr)?$/.test(m.trackId)) void queued(forCurrent(selectCaptionsNow))(m.trackId);
   });
 })();

@@ -6,7 +6,7 @@
   let visible = true, buffering = false, tick = null, refreshTimer = null, lyricTimer = null;
   let playerObserver = null, barObserver = null, captionObserver = null;
   let observedPlayer = null, observedBar = null, observedCaptions = null;
-  let generation = 0, lyricsAttempt = '';
+  let generation = 0, lyricsAttempt = '', lyricsRetries = 0;
   // Per video: caption tracks chosen in the app (slot 1 = main, 2 = secondary) and the last sent track list.
   let preferredTrack = '', secondaryTrack = '', secondaryCues = null, tracksSig = '';
   const cache = new Map(); // Normalized cues only; no request URLs or credentials.
@@ -104,6 +104,13 @@
       if (epoch !== generation || track?.videoId !== id || track.isAd || cues?.cues?.length) return;
       // No companion app yet: don't query anyone; try again when the app asks for a snapshot.
       if (result?.offline) { lyricsAttempt = ''; return; }
+      // Network/server trouble: retry later (20 s, 60 s), then fall back as for "not found".
+      if (result?.transient && lyricsRetries < 2) {
+        const delay = [20000, 60000][lyricsRetries++];
+        clearTimeout(lyricTimer);
+        lyricTimer = setTimeout(() => void lrclib(id, epoch), delay);
+        return;
+      }
       if (result?.cues?.length) emitCues({type:'cues', videoId:id, source:'lrclib', kind:'lyrics', synced:true, cues:result.cues});
       else askMain('lyrics', {videoId:id}); // YTM's own (usually unsynced) lyrics as the last resort
     } catch { if (epoch === generation && track?.videoId === id && !cues?.cues?.length) askMain('lyrics', {videoId:id}); }
@@ -145,7 +152,7 @@
     const adChanged = next.isAd !== track?.isAd;
     track = next;
     if (changed) {
-      generation++; lyricsAttempt = ''; captionText = ''; cues = emptyCues(); preferredTrack = ''; secondaryTrack = ''; secondaryCues = null; tracksSig = '';
+      generation++; lyricsAttempt = ''; lyricsRetries = 0; captionText = ''; cues = emptyCues(); preferredTrack = ''; secondaryTrack = ''; secondaryCues = null; tracksSig = '';
       // Short TTL also avoids persisting changing/live captions across navigation.
       const cached = [...cache.values()].reverse().find(c => c.value.videoId === next.videoId && Date.now() - c.at < 300000);
       if (cached) cues = cached.value;
@@ -207,7 +214,7 @@
       refresh();
       if (track) { send({type:'track', ...track}); clock(); if (!track.isAd) { send(cues || emptyCues()); if (secondaryCues) send(secondaryCues); sendCaptionTracks(true); } }
     }
-    if (message.type === 'connectCaptions') askMain('connectCaptions');
+    if (message.type === 'connectCaptions' && track) askMain('connectCaptions', {videoId: track.videoId});
     if (message.type === 'selectCaptions' && typeof message.trackId === 'string' && track && !music) {
       const slot = message.slot === 2 ? 2 : 1, id = message.trackId;
       if (slot === 2 && id === '') {
@@ -215,7 +222,7 @@
         send({type:'cues', videoId:track.videoId, source:'yt-captions', kind:'manual', synced:true, slot:2, cues:[]});
       } else if (/^[A-Za-z0-9_-]{1,24}(:asr)?$/.test(id)) {
         if (slot === 2) { secondaryTrack = id; secondaryCues = null; } else preferredTrack = id;
-        askMain('selectCaptions', {trackId: id});
+        askMain('selectCaptions', {trackId: id, videoId: track.videoId});
       }
     }
     if (message.type === 'cmd' && video && track && (!message.videoId || message.videoId === track.videoId)) {

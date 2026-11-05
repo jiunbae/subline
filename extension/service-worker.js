@@ -41,7 +41,10 @@ function toTab(tabId, message) {
 async function snapshot() {
   const tabs = await chrome.tabs.query({url:MATCH});
   const ids = new Set(tabs.map(t => t.id));
-  for (const [id, state] of states) {
+  // Replay in playback-activation order (most recently started last): the app treats the last
+  // paused→playing tab as the one to follow, so a reconnect must not reorder that.
+  const ordered = [...states].sort((a, b) => (a[1].playStartedAt || 0) - (b[1].playStartedAt || 0));
+  for (const [id, state] of ordered) {
     if (!ids.has(id)) { states.delete(id); continue; }
     for (const type of ['track','clock','cues','cues2','captionTracks']) if (state[type] && !(type.startsWith('cues') && state.track?.isAd)) nativeSend(id, state[type]);
   }
@@ -128,7 +131,7 @@ async function lyrics(query) {
   if (hit && Date.now() - hit.at < 300000) return hit.result;
   if (inflight.has(key)) return inflight.get(key);
   const work = (async () => {
-    let result = {cues:[]};
+    let result = {cues:[]}, transient = false;
     // Retry with localized/decorative suffixes removed, e.g. "The Chainsmokers(체인스모커스)",
     // "Song (Official Audio)", "Artist - Topic".
     const clean = value => value.replace(/\s*[([（【][^)\]）】]*[)\]）】]/g, '').replace(/\s+-\s+Topic$/i, '').trim();
@@ -140,13 +143,14 @@ async function lyrics(query) {
         const params = new URLSearchParams({track_name:title,artist_name:artist,duration:String(Math.round(query.duration))});
         if (typeof query.album === 'string' && query.album) params.set('album_name',query.album.slice(0,1000));
         const response = await fetch(`https://lrclib.net/api/get?${params}`, {signal:AbortSignal.timeout(7000), credentials:'omit'});
+        if (response.status === 429 || response.status >= 500) transient = true;
         if (response.ok) {
           const data = await response.json();
           if (Number.isFinite(data.duration) && Math.abs(data.duration - query.duration) <= 3 && typeof data.syncedLyrics === 'string' && data.syncedLyrics.length < 500000) {
             result = {cues:NPParsers.parseLRC(data.syncedLyrics, query.duration)};
           }
         }
-      } catch { /* Missing lyrics/rate limiting never affects playback. */ }
+      } catch { transient = true; /* offline/timeout: never affects playback */ }
       if (result.cues.length) break;
     }
     // Last resort: LRCLIB search (one request). Takes a synced entry within ±3 s of the track's
@@ -156,6 +160,7 @@ async function lyrics(query) {
         const [title, artist] = cleaned;
         const params = new URLSearchParams({track_name:title, artist_name:artist});
         const response = await fetch(`https://lrclib.net/api/search?${params}`, {signal:AbortSignal.timeout(7000), credentials:'omit'});
+        if (response.status === 429 || response.status >= 500) transient = true;
         if (response.ok) {
           const list = await response.json();
           const norm = value => String(value || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
@@ -175,8 +180,10 @@ async function lyrics(query) {
             if (parsed.length) { result = {cues:parsed}; break; }
           }
         }
-      } catch { /* Search is best effort. */ }
+      } catch { transient = true; }
     }
+    // Only a definite answer is cached; a network/server failure is retried by the page.
+    if (!result.cues.length && transient) return {cues:[], transient:true};
     lyricCache.set(key, {at:Date.now(),result});
     while (lyricCache.size > 24) lyricCache.delete(lyricCache.keys().next().value);
     return result;
@@ -203,6 +210,7 @@ chrome.runtime.onMessage.addListener((request, sender, respond) => {
     if (!state) state = {};
     if (message.type !== 'track' && state.track?.videoId !== message.videoId) return;
     if (state.track?.isAd && ['cues','liveCaption'].includes(message.type) && message.text !== '') return;
+    if (message.type === 'clock' && !message.paused && state.clock?.paused !== false) state.playStartedAt = Date.now();
     state[message.type === 'cues' && message.slot === 2 ? 'cues2' : message.type] = message; states.set(id,state);
     if (message.type === 'track' && message.isAd) delete state.cues;
   }

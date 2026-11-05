@@ -158,7 +158,9 @@ final class PlayerModel {
     /// Artwork candidate key whose image is currently in `artwork` (set when the load lands).
     @ObservationIgnored private var artworkShownKey: String?
     @ObservationIgnored private var thumbsLoaded = false
-    @ObservationIgnored private var secondarySent: [String: String] = [:] // videoId → requested secondary id ("" = off)
+    /// Secondary request per video; retried (once) when nothing matching arrived within 10 s.
+    @ObservationIgnored private var secondarySent: [String: CaptionRequest] = [:]
+    @ObservationIgnored private var secondaryMappedFor: [Cue] = []
     @ObservationIgnored private var timer: DispatchSourceTimer?
     @ObservationIgnored private var panelVisible = true
     @ObservationIgnored private var artworkKey: String?
@@ -252,8 +254,10 @@ final class PlayerModel {
     /// Secondary track: shown under the main text. nil turns it off.
     func selectSecondary(_ id: String?, remember: Bool = true) {
         guard let k = store.activeKey, let vid = store.active?.track?.videoId else { return }
+        if let id, id == captionTrackID { return } // the main track can't also be the sub
         if remember { preferredSecondaryID = id }
-        secondarySent[vid] = id ?? ""
+        let tries = (secondarySent[vid].map { $0.id == (id ?? "") ? $0.tries + 1 : 1 } ?? 1)
+        secondarySent[vid] = CaptionRequest(id: id ?? "", at: Self.now, tries: remember ? 1 : tries)
         send?(.selectCaptions(tab: k.tab, trackID: id ?? "", slot: 2), k.conn)
         if id == nil {
             assign(\.secondaryCues, []); assign(\.secondaryActiveIndex, nil); assign(\.secondaryTrackID, nil)
@@ -263,10 +267,9 @@ final class PlayerModel {
 
     func selectCaptions(_ id: String, remember: Bool = true) {
         guard let k = store.activeKey, let vid = store.active?.track?.videoId else { return }
-        if remember {
-            preferredCaptionID = id
-            if preferredSecondaryID == id { selectSecondary(nil) } // main and sub can't be the same track
-        }
+        if remember { preferredCaptionID = id }
+        // Main and sub can't be the same track (incl. the same auto-translation).
+        if secondaryTrackID == id || (remember && preferredSecondaryID == id) { selectSecondary(nil, remember: remember) }
         let tries = remember ? 1 : (captionSelectSent[vid].map { $0.id == id ? $0.tries + 1 : 1 } ?? 1)
         captionSelectSent[vid] = CaptionRequest(id: id, at: Self.now, tries: tries)
         send?(.selectCaptions(tab: k.tab, trackID: id), k.conn)
@@ -346,7 +349,11 @@ final class PlayerModel {
         assign(\.cues, cueSet == nil ? [] : s.timeline.cues)
         let sub = (s.secondaryCueSet?.videoId == t.videoId && !(t.isAd ?? false) && cueSet != nil) ? s.secondaryCueSet : nil
         let subCues = sub == nil ? [] : s.secondaryTimeline.cues
-        if subCues != secondaryCues || cues.count != secondaryByRow.count {
+        // Rebuild when either track's content changes (not just the row count: a different main track
+        // with the same number of lines must not keep the old mapping). Equal arrays share storage, so
+        // this is a pointer check on ordinary ticks.
+        if subCues != secondaryCues || cues != secondaryMappedFor {
+            secondaryMappedFor = cues
             assign(\.secondaryCues, subCues)
             assign(\.secondaryByRow, subCues.isEmpty ? [] : cues.map { c in
                 s.secondaryTimeline.activeIndex(at: c.s + 0.05).map { s.secondaryTimeline.cues[$0].text }
@@ -386,7 +393,9 @@ final class PlayerModel {
 
     /// Applies the remembered secondary track once per video, after the main text is in.
     private func applySecondaryPreference(_ s: TabState, _ t: TrackInfo) {
-        guard t.site == "yt", !(t.isAd ?? false), s.isPlaying, secondarySent[t.videoId] == nil,
+        // Retry a request that produced nothing after 10 s, at most twice per video.
+        if let r = secondarySent[t.videoId], r.id.isEmpty || r.id == secondaryTrackID || Self.now - r.at < 10 || r.tries >= 2 { return }
+        guard t.site == "yt", !(t.isAd ?? false), s.isPlaying,
               captionTrackID != nil, !captionsLoading,
               let target = CaptionTrack.best(for: preferredSecondaryID, in: s.captionTracks + s.translations),
               target.id != captionTrackID else { return }
