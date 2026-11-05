@@ -6,7 +6,8 @@ No build step or npm dependencies. Requires Chrome 120+ (30-second reconnect ala
 2. Open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and select this `extension/` directory.
 3. Confirm the extension ID is `npkfiaebcfackgbinodgjobdlmeceaij`. The public key is embedded in `manifest.json`; never distribute the private key.
 4. Reload existing YouTube / YouTube Music tabs so the document-start scripts attach. Start playback; the native panel should receive metadata and playback state. Clicking the extension action requests a fresh snapshot.
-5. The companion app auto-connects captions when a YouTube video has none (setting **Auto-Connect Captions**, default on), or use its **Connect captions** action to briefly toggle captions and restore their previous state. Captions already requested by the page are observed automatically. Playback controls are routed back to that tab.
+5. Caption tracks offered by the player are reported to the app (`captionTracks`); the app can ask for a specific one (`selectCaptions`). The bridge then sets the player's track with `setOption('captions','track',{languageCode,kind})` (a full track object is ignored by the player), captures that response, and restores the player's own track and CC state. Captured tracks are cached per video because the player does not refetch a track it already loaded.
+6. The companion app auto-connects captions when a YouTube video has none (setting **Auto-Connect Captions**, default on), or use its **Connect captions** action to briefly toggle captions and restore their previous state. Captions already requested by the page are observed automatically. Playback controls are routed back to that tab.
 
 Run parser and worker tests from the repository root:
 

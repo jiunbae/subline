@@ -61,6 +61,13 @@ public struct CueTimeline: Sendable, Equatable {
         return i
     }
 
+    /// The first cue that has not started yet at time t (the "next line" preview), or nil.
+    public func upcomingIndex(at t: Double) -> Int? {
+        guard synced else { return nil }
+        let n = (lastStarted(at: t) ?? -1) + 1
+        return n < cues.count ? n : nil
+    }
+
     /// Next media time at which `activeIndex` may change.
     public func nextBoundary(after t: Double) -> Double? {
         guard synced, !cues.isEmpty else { return nil }

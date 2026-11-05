@@ -112,3 +112,33 @@ test('LRCLIB retries once with localized/decorative suffixes removed',async()=>{
   assert.equal(q[1].get('track_name'),'Song');
   assert.equal(q[1].get('artist_name'),'The Band');
 });
+test('caption track lists are sanitized, cached for snapshots, and selection commands validated',async()=>{
+  const h=harness(); await flush(); h.publish(track);
+  h.publish({type:'captionTracks',videoId:track.videoId,tracks:[
+    {id:'en',lang:'en',name:'English'},{id:'ko:asr',lang:'ko',name:'Korean (auto)',kind:'asr'},
+    {id:'bad id!',lang:'x',name:'nope'},{id:'ja',lang:'ja'}]});
+  const sent=h.messages.at(-1);
+  assert.equal(sent.type,'captionTracks');
+  assert.deepEqual(sent.tracks,[{id:'en',lang:'en',name:'English'},{id:'ko:asr',lang:'ko',name:'Korean (auto)',kind:'asr'},{id:'ja',lang:'ja',name:'ja'}]);
+  h.ports[0].onDisconnect.callbacks[0](); h.timers[0].fn(); await flush();
+  assert.ok(h.messages.slice(-4).some(m=>m.type==='captionTracks'));
+  h.sent.length=0;
+  h.ports[1].onMessage.callbacks[0]({v:1,type:'selectCaptions',tabId:7,trackId:'en"><x'});
+  h.ports[1].onMessage.callbacks[0]({v:1,type:'selectCaptions',tabId:7,trackId:'ko:asr'});
+  await flush();
+  assert.deepEqual(h.sent.filter(m=>m.type==='selectCaptions').map(m=>m.trackId),['ko:asr']);
+});
+test('secondary caption slot is forwarded, kept apart from main cues in snapshots, and can be cleared',async()=>{
+  const h=harness(); await flush(); h.publish(track);
+  h.publish({type:'cues',videoId:track.videoId,source:'yt-captions',lang:'en',kind:'manual',synced:true,cues:[{s:1,e:2,text:'Hello'}]});
+  h.publish({type:'cues',videoId:track.videoId,source:'yt-captions',lang:'ko',kind:'manual',synced:true,slot:2,cues:[{s:1,e:2,text:'안녕'}]});
+  assert.equal(h.messages.at(-1).slot,2);
+  h.ports[0].onDisconnect.callbacks[0](); h.timers[0].fn(); await flush();
+  const cues=h.messages.filter(m=>m.type==='cues').slice(-2);
+  assert.deepEqual(cues.map(m=>m.slot ?? 1),[1,2]);
+  h.sent.length=0;
+  h.ports[1].onMessage.callbacks[0]({v:1,type:'selectCaptions',tabId:7,trackId:'',slot:2});
+  h.ports[1].onMessage.callbacks[0]({v:1,type:'selectCaptions',tabId:7,trackId:'',slot:1});
+  await flush();
+  assert.deepEqual(h.sent.filter(m=>m.type==='selectCaptions').map(m=>[m.trackId,m.slot]),[['',2]]);
+});

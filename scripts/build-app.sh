@@ -12,6 +12,13 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Helpers" "$APP/Contents/Resources"
 cp "$BIN/NowPlaying" "$APP/Contents/MacOS/NowPlaying"
 cp "$BIN/np-host" "$APP/Contents/Helpers/np-host"
+cp "$ROOT/app/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
+# Bundled extension for the setup window's "Load unpacked" path (tests/docs excluded).
+rsync -a --delete --exclude test --exclude README.md --exclude '.*' "$ROOT/extension/" "$APP/Contents/Resources/extension/"
+# Chrome Web Store ID (after publishing): env STORE_EXTENSION_ID or keys/store-extension-id.txt.
+STORE_ID="${STORE_EXTENSION_ID:-$(cat "$ROOT/keys/store-extension-id.txt" 2>/dev/null || true)}"
+STORE_ID="$(echo "$STORE_ID" | tr -d '[:space:]')"
+if [[ -n "$STORE_ID" && ! "$STORE_ID" =~ ^[a-p]{32}$ ]]; then echo "invalid store extension id: $STORE_ID" >&2; exit 1; fi
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -20,6 +27,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleName</key><string>Now Playing</string>
   <key>CFBundleDisplayName</key><string>Now Playing</string>
   <key>CFBundleExecutable</key><string>NowPlaying</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
+  <key>NPStoreExtensionID</key><string>${STORE_ID}</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>0.1.0</string>
   <key>CFBundleVersion</key><string>1</string>

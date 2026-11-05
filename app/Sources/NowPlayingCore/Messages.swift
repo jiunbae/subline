@@ -40,6 +40,52 @@ public struct CueSet: Codable, Sendable, Equatable {
     public var kind: String
     public var synced: Bool
     public var cues: [Cue]
+    /// 2 for the secondary ("sub") caption track; nil/1 for the main text.
+    public var slot: Int?
+    public init(videoId: String, source: String, lang: String?, kind: String, synced: Bool, cues: [Cue], slot: Int? = nil) {
+        self.videoId = videoId; self.source = source; self.lang = lang; self.kind = kind
+        self.synced = synced; self.cues = cues; self.slot = slot
+    }
+    public var isSecondary: Bool { slot == 2 }
+}
+
+/// One caption track the YouTube player offers for the current video.
+public struct CaptionTrack: Codable, Sendable, Equatable, Identifiable {
+    /// `lang` plus ":asr" for auto-generated tracks, e.g. "en", "en:asr".
+    public var id: String
+    public var lang: String
+    public var name: String
+    public var kind: String? // "asr" for auto-generated
+    public init(id: String, lang: String, name: String, kind: String? = nil) {
+        self.id = id; self.lang = lang; self.name = name; self.kind = kind
+    }
+    public var isAuto: Bool { kind == "asr" }
+
+    /// Best track for a remembered choice: exact id, else the same language (then the same base
+    /// language, e.g. "en" for "en-GB"), preferring manual tracks over auto-generated ones.
+    public static func best(for preferred: String?, in tracks: [CaptionTrack]) -> CaptionTrack? {
+        guard let preferred, !tracks.isEmpty else { return nil }
+        if let exact = tracks.first(where: { $0.id == preferred }) { return exact }
+        let lang = preferred.replacingOccurrences(of: ":asr", with: "")
+        let base = lang.split(separator: "-").first.map(String.init) ?? lang
+        let sameLang = tracks.filter { $0.lang == lang }
+        let sameBase = tracks.filter { $0.lang != lang && ($0.lang == base || $0.lang.hasPrefix(base + "-")) }
+        let candidates = sameLang + sameBase
+        return candidates.first(where: { !$0.isAuto }) ?? candidates.first
+    }
+}
+
+public struct CaptionTrackList: Codable, Sendable, Equatable {
+    public var videoId: String
+    public var tracks: [CaptionTrack]
+}
+
+extension CueSet {
+    /// Caption track id of this set (matches `CaptionTrack.id`), nil for lyrics.
+    public var trackID: String? {
+        guard source == "yt-captions", let lang, !lang.isEmpty else { return nil }
+        return kind == "asr" ? "\(lang):asr" : lang
+    }
 }
 
 public struct LiveCaption: Codable, Sendable, Equatable {
@@ -53,6 +99,7 @@ public enum Incoming: Sendable, Equatable {
     case clock(tab: Int, seq: Int?, ClockInfo)
     case cues(tab: Int, seq: Int?, CueSet)
     case liveCaption(tab: Int, seq: Int?, LiveCaption)
+    case captionTracks(tab: Int, seq: Int?, CaptionTrackList)
     case gone(tab: Int)
     case unknown(String)
 
@@ -80,6 +127,7 @@ public enum Incoming: Sendable, Equatable {
         case "clock": return .clock(tab: try tab(), seq: env.seq, try dec.decode(ClockInfo.self, from: data))
         case "cues": return .cues(tab: try tab(), seq: env.seq, try dec.decode(CueSet.self, from: data))
         case "liveCaption": return .liveCaption(tab: try tab(), seq: env.seq, try dec.decode(LiveCaption.self, from: data))
+        case "captionTracks": return .captionTracks(tab: try tab(), seq: env.seq, try dec.decode(CaptionTrackList.self, from: data))
         case "gone": return .gone(tab: try tab())
         default: return .unknown(env.type)
         }
@@ -91,6 +139,8 @@ public enum Outgoing: Sendable, Equatable {
     case visibility(Bool)
     case requestSnapshot
     case connectCaptions(tab: Int)
+    /// slot 1 = main text, 2 = secondary; an empty trackID with slot 2 turns the secondary off.
+    case selectCaptions(tab: Int, trackID: String, slot: Int = 1)
 
     public func json() -> Data {
         var obj: [String: Any] = ["v": 1]
@@ -104,6 +154,8 @@ public enum Outgoing: Sendable, Equatable {
             obj["type"] = "requestSnapshot"
         case let .connectCaptions(tab):
             obj["type"] = "connectCaptions"; obj["tabId"] = tab
+        case let .selectCaptions(tab, trackID, slot):
+            obj["type"] = "selectCaptions"; obj["tabId"] = tab; obj["trackId"] = trackID; obj["slot"] = slot
         }
         return (try? JSONSerialization.data(withJSONObject: obj, options: [.sortedKeys])) ?? Data()
     }

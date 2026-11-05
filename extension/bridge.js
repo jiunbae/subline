@@ -24,9 +24,77 @@
         artist: valid?.author || (data.video_id === id ? data.author : '') || '',
         duration: Number(valid?.lengthSeconds) || 0,
         thumbnails: valid?.thumbnail?.thumbnails || [],
+        captionTracks: valid ? captionTracks(response) : [],
         isAd: !!p?.classList?.contains('ad-showing')
       }});
     } catch { /* DOM-only adapter remains available. */ }
+  }
+  // Caption tracks the player offers: id is lang plus ":asr" for auto-generated ones.
+  function captionTracks(response) {
+    const list = response?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+    if (!Array.isArray(list)) return [];
+    return list.slice(0, 100).map(t => ({
+      id: (t.languageCode || '') + (t.kind === 'asr' ? ':asr' : ''),
+      lang: t.languageCode || '',
+      name: String(t.name?.simpleText || (t.name?.runs || []).map(r => r.text).join('') || t.languageCode || '').slice(0, 80),
+      ...(t.kind === 'asr' ? {kind: 'asr'} : {})
+    })).filter((t, i, all) => /^[A-Za-z0-9_-]{1,24}(:asr)?$/.test(t.id) && all.findIndex(o => o.id === t.id) === i);
+  }
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+  // The player does not refetch a track it already loaded, so keep the last few captured tracks.
+  const captured = new Map(); // `${videoId}|${trackId}` → {cues, lang, trackKind}
+  function remember(id, trackId, value) {
+    const key = `${id}|${trackId}`;
+    captured.delete(key); captured.set(key, value);
+    while (captured.size > 8) captured.delete(captured.keys().next().value);
+  }
+  // Makes the player itself fetch another caption track (so its PoToken applies), lets the timedtext
+  // hook capture it, then restores the player's own caption state.
+  // Caption operations run one at a time (main + secondary arrive back to back).
+  let captionQueue = Promise.resolve();
+  const queued = fn => (...args) => { captionQueue = captionQueue.then(() => fn(...args)).catch(() => {}); return captionQueue; };
+  async function selectCaptionsNow(trackId) {
+    const p = document.querySelector('#movie_player');
+    const button = document.querySelector('.ytp-subtitles-button');
+    if (ccBusy || !p?.setOption || !button || button.disabled) return;
+    const id = videoId();
+    const hit = captured.get(`${id}|${trackId}`);
+    if (hit) { post('captions', {videoId: id, ...hit}); return; }
+    ccBusy = true;
+    const wasOn = button.getAttribute('aria-pressed') === 'true';
+    const current = () => { try { return p.getOption('captions', 'track'); } catch { return null; } };
+    const simple = t => t?.languageCode ? {languageCode: t.languageCode, ...(t.kind === 'asr' ? {kind: 'asr'} : {})} : null;
+    try {
+      if (!wasOn) {
+        button.click();
+        // Wait for the captions module to settle on its default track.
+        for (let i = 0; i < 10 && !current()?.languageCode; i++) await sleep(100);
+      }
+      if (videoId() !== id) return;
+      // Restored afterwards: setOption also changes the player's remembered caption language.
+      const original = simple(current());
+      const [lang, asr] = [trackId.replace(/:asr$/, ''), trackId.endsWith(':asr')];
+      const want = {languageCode: lang, ...(asr ? {kind: 'asr'} : {})};
+      const isWanted = () => current()?.languageCode === lang && (current()?.kind === 'asr') === asr;
+      // The track list may still be loading right after navigation.
+      for (let i = 0; i < 12 && videoId() === id && !isWanted(); i++) {
+        // Only the plain {languageCode, kind} form is honored; a full track object is ignored.
+        try { p.setOption('captions', 'track', want); } catch {}
+        await sleep(250);
+      }
+      if (videoId() !== id) return;
+      if (isWanted()) {
+        for (let i = 0; i < 10 && !captured.has(`${id}|${trackId}`); i++) await sleep(200);
+        const got = captured.get(`${id}|${trackId}`);
+        if (got) post('captions', {videoId: id, ...got}); // re-post in case it raced the app's choice
+      }
+      if (videoId() !== id || !button.isConnected) return;
+      if (original && (original.languageCode !== lang || (original.kind === 'asr') !== asr)) {
+        try { p.setOption('captions', 'track', original); } catch {}
+        await sleep(150);
+      }
+      if (!wasOn && button.getAttribute('aria-pressed') === 'true') button.click();
+    } finally { ccBusy = false; }
   }
   function discoverBrowse(value, id, depth = 0, budget = {n: 0}) {
     if (!value || typeof value !== 'object' || depth > 24 || ++budget.n > 25000) return;
@@ -51,7 +119,13 @@
       if (url.searchParams.get('v') && url.searchParams.get('v') !== id) return;
       const asr = url.searchParams.get('kind') === 'asr';
       const cues = text.trimStart().startsWith('{') ? NPParsers.parseJSON3(text, asr) : parseXML(text, asr);
-      if (cues.length) post('captions', {videoId: id, cues, lang: url.searchParams.get('lang') || '', trackKind: asr ? 'asr' : 'manual'});
+      // Auto-translated responses carry the target language in tlang.
+      const lang = url.searchParams.get('tlang') || url.searchParams.get('lang') || '';
+      const trackKind = asr && !url.searchParams.get('tlang') ? 'asr' : 'manual';
+      if (cues.length) {
+        remember(id, lang + (trackKind === 'asr' ? ':asr' : ''), {cues, lang, trackKind});
+        post('captions', {videoId: id, cues, lang, trackKind, translated: !!url.searchParams.get('tlang')});
+      }
     }
   }
   function interesting(value) {
@@ -161,6 +235,7 @@
     if (event.source !== window || event.origin !== location.origin || m?.channel !== CHANNEL || m.direction !== 'to-main') return;
     if (m.kind === 'metadata') metadata();
     if (m.kind === 'lyrics' && typeof m.videoId === 'string') void getLyrics(m.videoId);
-    if (m.kind === 'connectCaptions') void connectCaptions();
+    if (m.kind === 'connectCaptions') void queued(connectCaptions)();
+    if (m.kind === 'selectCaptions' && typeof m.trackId === 'string' && /^[A-Za-z0-9_-]{1,24}(:asr)?$/.test(m.trackId)) void queued(selectCaptionsNow)(m.trackId);
   });
 })();

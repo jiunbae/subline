@@ -50,14 +50,18 @@ actor ArtworkLoader {
 
     private var cache: [String: Result] = [:]
     private var order: [String] = []
-    private let capacity = 6
+    /// Decoded 720 px RGBA is ~2 MB each; 3 covers back/forward between recent tracks.
+    private let capacity = 3
     private let maxPixel = 720
 
     private static let allowedHosts = ["i.ytimg.com", "i9.ytimg.com", "yt3.ggpht.com", "yt3.googleusercontent.com", "lh3.googleusercontent.com"]
 
     func load(urls: [String]) async -> Result? {
         for s in urls {
-            if let hit = cache[s] { return hit }
+            if let hit = cache[s] {
+                order.removeAll { $0 == s }; order.append(s) // true LRU: a hit refreshes recency
+                return hit
+            }
             guard let url = URL(string: s), Self.isAllowed(url) else { continue }
             guard let data = await fetch(url), let r = decode(data) else { continue }
             insert(s, r)

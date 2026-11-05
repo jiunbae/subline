@@ -13,7 +13,13 @@ public struct TabState: Sendable, Equatable {
     public var clock: PlaybackClock?
     public var cueSet: CueSet?
     public var timeline: CueTimeline = .empty
+    /// Secondary caption track shown under the main text.
+    public var secondaryCueSet: CueSet?
+    public var secondaryTimeline: CueTimeline = .empty
     public var liveCaption: String?
+    public var captionTracks: [CaptionTrack] = []
+    /// True once the extension reported the track list for this video (it may be empty: no captions).
+    public var captionTracksKnown = false
     public var lastSeq: Int = Int.min
     public var lastActivity: Double = 0
     public var startedAt: Double = 0 // last paused→playing transition
@@ -25,6 +31,8 @@ public struct TabState: Sendable, Equatable {
 public struct SessionStore: Sendable {
     public private(set) var tabs: [TabKey: TabState] = [:]
     public var pinned: TabKey?
+    /// Extension version reported in `hello`, per host connection.
+    public private(set) var extensionVersions: [Int: String] = [:]
 
     public init() {}
 
@@ -32,7 +40,8 @@ public struct SessionStore: Sendable {
     @discardableResult
     public mutating func apply(_ msg: Incoming, conn: Int, now: Double) -> Bool {
         switch msg {
-        case .hello:
+        case let .hello(ext):
+            if let ext { extensionVersions[conn] = ext }
             // New extension session on this connection: seq restarts.
             for k in tabs.keys where k.conn == conn { tabs[k]?.lastSeq = Int.min }
             return false
@@ -46,7 +55,8 @@ public struct SessionStore: Sendable {
             return mutate(TabKey(conn: conn, tab: tab), seq: seq, now: now) { s in
                 if s.track?.videoId != info.videoId {
                     // New video: nothing from the previous one may leak (clock, cues, captions).
-                    s.cueSet = nil; s.timeline = .empty; s.liveCaption = nil
+                    s.cueSet = nil; s.timeline = .empty; s.liveCaption = nil; s.captionTracks = []; s.captionTracksKnown = false
+                    s.secondaryCueSet = nil; s.secondaryTimeline = .empty
                     s.clock = nil; s.startedAt = 0
                 }
                 s.track = info
@@ -62,8 +72,18 @@ public struct SessionStore: Sendable {
             }
         case let .cues(tab, seq, set):
             return mutate(TabKey(conn: conn, tab: tab), seq: seq, now: now, videoId: set.videoId) { s in
-                s.cueSet = set
-                s.timeline = CueTimeline(cues: set.cues, synced: set.synced)
+                if set.isSecondary {
+                    s.secondaryCueSet = set.cues.isEmpty ? nil : set
+                    s.secondaryTimeline = set.cues.isEmpty ? .empty : CueTimeline(cues: set.cues, synced: set.synced)
+                } else {
+                    s.cueSet = set
+                    s.timeline = CueTimeline(cues: set.cues, synced: set.synced)
+                }
+            }
+        case let .captionTracks(tab, seq, list):
+            return mutate(TabKey(conn: conn, tab: tab), seq: seq, now: now, videoId: list.videoId) { s in
+                s.captionTracks = Array(list.tracks.prefix(200))
+                s.captionTracksKnown = true
             }
         case let .liveCaption(tab, seq, lc):
             return mutate(TabKey(conn: conn, tab: tab), seq: seq, now: now, videoId: lc.videoId) { s in
@@ -92,6 +112,7 @@ public struct SessionStore: Sendable {
     public mutating func removeConnection(_ conn: Int) {
         tabs = tabs.filter { $0.key.conn != conn }
         if pinned?.conn == conn { pinned = nil }
+        extensionVersions[conn] = nil
     }
 
     /// Pinned tab, else most recently started playing tab, else most recently active tab.

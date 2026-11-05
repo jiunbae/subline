@@ -39,7 +39,7 @@ async function snapshot() {
   const ids = new Set(tabs.map(t => t.id));
   for (const [id, state] of states) {
     if (!ids.has(id)) { states.delete(id); continue; }
-    for (const type of ['track','clock','cues']) if (state[type] && !(type === 'cues' && state.track?.isAd)) nativeSend(id, state[type]);
+    for (const type of ['track','clock','cues','cues2','captionTracks']) if (state[type] && !(type.startsWith('cues') && state.track?.isAd)) nativeSend(id, state[type]);
   }
   await Promise.all(tabs.map(t => toTab(t.id, {type:'visibility', visible})));
   await Promise.all(tabs.map(t => toTab(t.id, {type:'requestSnapshot'})));
@@ -63,7 +63,9 @@ function connect() {
       else if (message.type === 'visibility' && typeof message.visible === 'boolean') {
         visible = message.visible;
         void chrome.tabs.query({url:MATCH}).then(tabs => Promise.all(tabs.map(t => toTab(t.id, {type:'visibility', visible}))));
-      } else if (['cmd','connectCaptions'].includes(message.type) && Number.isInteger(message.tabId)) {
+      } else if (['cmd','connectCaptions','selectCaptions'].includes(message.type) && Number.isInteger(message.tabId)) {
+        if (message.type === 'selectCaptions' && !(typeof message.trackId === 'string' &&
+          (TRACK_ID.test(message.trackId) || (message.slot === 2 && message.trackId === '')))) return;
         if (message.type === 'cmd' && (!['play','pause','toggle','next','prev','seek'].includes(message.action) ||
           (message.action === 'seek' && !Number.isFinite(message.t)))) return;
         void chrome.tabs.get(message.tabId).then(tab => {
@@ -75,6 +77,7 @@ function connect() {
     void snapshot();
   } catch { disconnect(); }
 }
+const TRACK_ID = /^[A-Za-z0-9_-]{1,24}(:asr)?$/;
 function sanitize(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const str = (value, max = 2000) => typeof value === 'string' ? value.slice(0,max) : '';
@@ -92,12 +95,16 @@ function sanitize(raw) {
   }
   if (raw.type === 'clock' && Number.isFinite(raw.t) && Number.isFinite(raw.rate)) return {...common,
     t:Math.max(0,raw.t), rate:raw.rate, paused:raw.paused === true, buffering:raw.buffering === true};
+  if (raw.type === 'captionTracks' && Array.isArray(raw.tracks)) return {...common, tracks: raw.tracks.slice(0,100)
+    .filter(t => t && typeof t.id === 'string' && TRACK_ID.test(t.id) && typeof t.lang === 'string')
+    .map(t => ({id:t.id, lang:str(t.lang,24), name:str(t.name,80) || t.lang, ...(t.kind === 'asr' ? {kind:'asr'} : {})}))};
   if (raw.type === 'liveCaption') return {...common,text:str(raw.text,10000)};
   if (raw.type === 'cues' && ['yt-captions','ytm-lyrics','lrclib','dom'].includes(raw.source) &&
     ['manual','asr','lyrics'].includes(raw.kind) && Array.isArray(raw.cues) && raw.cues.length <= 20000) {
     const cues = NPParsers.normalizeCues(raw.cues.filter(c => c && typeof c === 'object')
       .map(c => ({s:c.s,e:c.e,text:str(c.text,10000)})));
-    const message = {...common,source:raw.source,kind:raw.kind,lang:str(raw.lang,40),synced:raw.synced === true,cues};
+    const message = {...common,source:raw.source,kind:raw.kind,lang:str(raw.lang,40),synced:raw.synced === true,cues,
+      ...(raw.slot === 2 ? {slot:2} : {})};
     return JSON.stringify(message).length < 900000 ? message : null;
   }
   return null;
@@ -155,7 +162,7 @@ chrome.runtime.onMessage.addListener((request, sender, respond) => {
     if (!state) state = {};
     if (message.type !== 'track' && state.track?.videoId !== message.videoId) return;
     if (state.track?.isAd && ['cues','liveCaption'].includes(message.type) && message.text !== '') return;
-    state[message.type] = message; states.set(id,state);
+    state[message.type === 'cues' && message.slot === 2 ? 'cues2' : message.type] = message; states.set(id,state);
     if (message.type === 'track' && message.isAd) delete state.cues;
   }
   nativeSend(id,message);

@@ -17,8 +17,9 @@ Every message is a JSON object with `"v": 1` and `"type"`. Messages from the ext
 |---|---|---|
 | `hello` | `ext` (version string), `ua` | on every (re)connect, followed by a full `track`+`clock`+`cues` snapshot of each active tab |
 | `track` | `site` (`"yt"`\|`"ytm"`), `videoId`, `title`, `artist`, `album`?, `duration` (s, number), `artwork`: `[{url,w,h}]` sorted best-first, `isAd` (bool) | on video change, metadata change, ad start/end |
-| `clock` | `videoId`, `t` (currentTime, s), `rate`, `paused` (bool), `buffering` (bool) | immediately on play/pause/seeking/seeked/ratechange/waiting/playing, and every 1 s while playing |
-| `cues` | `videoId`, `source` (`"yt-captions"`\|`"ytm-lyrics"`\|`"lrclib"`\|`"dom"`), `lang`?, `kind` (`"manual"`\|`"asr"`\|`"lyrics"`), `synced` (bool), `cues`: `[{s, e?, text}]` (seconds, sorted by `s`; `e` optional, `text` may contain `\n`) | when a track is obtained; an empty `cues` array means "none available". `ytm-lyrics` may be unsynced (`synced:false`, `s` = line index) |
+| `clock` | `videoId`, `t` (currentTime, s), `rate`, `paused` (bool), `buffering` (bool) | immediately on play/pause/seeking/seeked/ratechange/waiting/playing, and every 5 s while playing (drift correction; the app extrapolates) |
+| `cues` | `videoId`, `source` (`"yt-captions"`\|`"ytm-lyrics"`\|`"lrclib"`\|`"dom"`), `lang`?, `kind` (`"manual"`\|`"asr"`\|`"lyrics"`), `synced` (bool), `cues`: `[{s, e?, text}]` (seconds, sorted by `s`; `e` optional, `text` may contain `\n`) | when a track is obtained; an empty `cues` array means "none available". `ytm-lyrics` may be unsynced (`synced:false`, `s` = line index). `slot: 2` marks the secondary caption track (empty `cues` = secondary off) |
+| `captionTracks` | `videoId`, `tracks`: `[{id, lang, name, kind?}]` (`id` = `lang` or `lang:asr`; `kind:"asr"` for auto-generated; deduplicated by `id`) | YouTube only, when the player's track list is known or changes, and in snapshots; an empty list means the video has no captions |
 | `liveCaption` | `videoId`, `text` (string, `""` = clear) | DOM-observer fallback only, on change |
 | `gone` | — | tab closed / navigated away from a watch page |
 
@@ -31,6 +32,7 @@ When several tabs are active, the app follows the tab that most recently went fr
 | `visibility` | `visible` (bool). When false the extension may drop periodic `clock` ticks; event-driven ones are still sent |
 | `requestSnapshot` | — the extension resends `track`+`clock`+`cues` for all tabs |
 | `connectCaptions` | `tabId`. The user asked to obtain captions: toggle CC once, capture the timedtext response, restore the original CC state |
+| `selectCaptions` | `tabId`, `trackId` (a `captionTracks` id), `slot` (1 main, 2 secondary; `trackId:""` with slot 2 turns the secondary off). Make the player load that track (`setOption('captions','track',{languageCode,kind})`), capture it, then restore the player's own track and CC state. From then on the tab ignores captured captions of other tracks for this video |
 
 ## Example
 ```json

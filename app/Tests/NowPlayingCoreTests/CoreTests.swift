@@ -78,6 +78,15 @@ import Foundation
         #expect(tl.nextBoundary(after: 8) == nil)
     }
 
+    @Test func upcomingLinePreview() {
+        let tl = CueTimeline(cues: [Cue(s: 1, e: 3, text: "a"), Cue(s: 5, e: 7, text: "b")], synced: true)
+        #expect(tl.upcomingIndex(at: 0) == 0)   // before the first line
+        #expect(tl.upcomingIndex(at: 2) == 1)   // during a
+        #expect(tl.upcomingIndex(at: 4) == 1)   // in the gap
+        #expect(tl.upcomingIndex(at: 6) == nil) // last line
+        #expect(CueTimeline(cues: tl.cues, synced: false).upcomingIndex(at: 0) == nil)
+    }
+
     @Test func lyricsWithoutEndStayUntilNext() {
         let tl = CueTimeline(cues: [Cue(s: 1, text: "a"), Cue(s: 4, text: "b")], synced: true)
         #expect(tl.activeIndex(at: 3.9) == 0)
@@ -163,5 +172,99 @@ import Foundation
         s.removeConnection(1)
         #expect(s.tabs.count == 1)
         #expect(s.active?.track?.videoId == "b")
+    }
+}
+
+@Suite struct PathsTests {
+    @Test func storeExtensionIDValidation() {
+        #expect(NPPaths.validExtensionID("npkfiaebcfackgbinodgjobdlmeceaij") == "npkfiaebcfackgbinodgjobdlmeceaij")
+        #expect(NPPaths.validExtensionID("") == nil)
+        #expect(NPPaths.validExtensionID(nil) == nil)
+        #expect(NPPaths.validExtensionID("npkfiaebcfackgbinodgjobdlmeceaiz") == nil) // z is outside a–p
+        #expect(NPPaths.validExtensionID("npkfiaebcfackgbinodgjobdlmecea") == nil)   // too short
+        #expect(NPPaths.allowedExtensionIDs == [NPPaths.extensionID]) // no store ID in the test bundle
+    }
+}
+
+@Suite struct CaptionTrackTests {
+    let tracks = [CaptionTrack(id: "en", lang: "en", name: "English"),
+                  CaptionTrack(id: "en:asr", lang: "en", name: "English (auto-generated)", kind: "asr"),
+                  CaptionTrack(id: "ko:asr", lang: "ko", name: "Korean (auto-generated)", kind: "asr"),
+                  CaptionTrack(id: "pt-BR", lang: "pt-BR", name: "Portuguese (Brazil)")]
+
+    @Test func bestTrackForPreference() {
+        #expect(CaptionTrack.best(for: "en:asr", in: tracks)?.id == "en:asr")   // exact
+        #expect(CaptionTrack.best(for: "ko", in: tracks)?.id == "ko:asr")       // only auto exists
+        #expect(CaptionTrack.best(for: "en-GB", in: tracks)?.id == "en")        // base language, manual first
+        #expect(CaptionTrack.best(for: "pt", in: tracks)?.id == "pt-BR")
+        #expect(CaptionTrack.best(for: "ja", in: tracks) == nil)
+        #expect(CaptionTrack.best(for: nil, in: tracks) == nil)
+    }
+
+    @Test func parseAndStoreTrackList() throws {
+        let json = #"{"v":1,"type":"captionTracks","tabId":3,"seq":5,"videoId":"abc","tracks":[{"id":"en","lang":"en","name":"English"},{"id":"ko:asr","lang":"ko","name":"Korean","kind":"asr"}]}"#
+        let msg = try Incoming.parse(Data(json.utf8))
+        guard case let .captionTracks(tab, _, list) = msg else { Issue.record("wrong case"); return }
+        #expect(tab == 3 && list.tracks.count == 2 && list.tracks[1].isAuto)
+
+        var store = SessionStore()
+        let track = TrackInfo(site: "yt", videoId: "abc", title: "t", artist: "a", album: nil, duration: 100, artwork: [], isAd: false)
+        store.apply(.track(tab: 3, seq: 1, track), conn: 1, now: 0)
+        store.apply(msg, conn: 1, now: 0)
+        let key = TabKey(conn: 1, tab: 3)
+        #expect(store.tabs[key]?.captionTracksKnown == true)
+        #expect(store.tabs[key]?.captionTracks.map(\.id) == ["en", "ko:asr"])
+        // A different video clears the list.
+        var other = track; other.videoId = "xyz"
+        store.apply(.track(tab: 3, seq: 6, other), conn: 1, now: 0)
+        #expect(store.tabs[key]?.captionTracks.isEmpty == true)
+        #expect(store.tabs[key]?.captionTracksKnown == false)
+    }
+
+    @Test func cueSetTrackIDAndSelectJSON() throws {
+        let asr = CueSet(videoId: "v", source: "yt-captions", lang: "en", kind: "asr", synced: true, cues: [])
+        let lyrics = CueSet(videoId: "v", source: "lrclib", lang: nil, kind: "lyrics", synced: true, cues: [])
+        #expect(asr.trackID == "en:asr")
+        #expect(lyrics.trackID == nil)
+        let obj = try JSONSerialization.jsonObject(with: Outgoing.selectCaptions(tab: 4, trackID: "ko").json()) as? [String: Any]
+        #expect(obj?["type"] as? String == "selectCaptions")
+        #expect(obj?["trackId"] as? String == "ko")
+        #expect(obj?["tabId"] as? Int == 4)
+    }
+}
+
+@Suite struct SecondaryCaptionTests {
+    @Test func secondarySlotIsStoredApartAndClearedByNewVideo() {
+        var store = SessionStore()
+        let track = TrackInfo(site: "yt", videoId: "abc", title: "t", artist: "a", album: nil, duration: 100, artwork: [], isAd: false)
+        store.apply(.hello(ext: "0.2.0"), conn: 1, now: 0)
+        store.apply(.track(tab: 3, seq: 1, track), conn: 1, now: 0)
+        store.apply(.cues(tab: 3, seq: 2, CueSet(videoId: "abc", source: "yt-captions", lang: "en", kind: "manual", synced: true,
+                                                 cues: [Cue(s: 1, e: 2, text: "Hello")])), conn: 1, now: 0)
+        store.apply(.cues(tab: 3, seq: 3, CueSet(videoId: "abc", source: "yt-captions", lang: "ko", kind: "manual", synced: true,
+                                                 cues: [Cue(s: 1, e: 2, text: "안녕")], slot: 2)), conn: 1, now: 0)
+        let k = TabKey(conn: 1, tab: 3)
+        #expect(store.tabs[k]?.cueSet?.lang == "en")
+        #expect(store.tabs[k]?.secondaryCueSet?.lang == "ko")
+        #expect(store.tabs[k]?.secondaryTimeline.activeIndex(at: 1.5) == 0)
+        #expect(store.extensionVersions[1] == "0.2.0")
+        // Empty secondary set turns it off.
+        store.apply(.cues(tab: 3, seq: 4, CueSet(videoId: "abc", source: "yt-captions", lang: "", kind: "manual", synced: true,
+                                                 cues: [], slot: 2)), conn: 1, now: 0)
+        #expect(store.tabs[k]?.secondaryCueSet == nil)
+        #expect(store.tabs[k]?.cueSet?.lang == "en")
+        var other = track; other.videoId = "xyz"
+        store.apply(.cues(tab: 3, seq: 5, CueSet(videoId: "abc", source: "yt-captions", lang: "ko", kind: "manual", synced: true,
+                                                 cues: [Cue(s: 1, text: "x")], slot: 2)), conn: 1, now: 0)
+        store.apply(.track(tab: 3, seq: 6, other), conn: 1, now: 0)
+        #expect(store.tabs[k]?.secondaryCueSet == nil)
+        store.removeConnection(1)
+        #expect(store.extensionVersions[1] == nil)
+    }
+
+    @Test func selectSecondaryJSONCarriesSlot() throws {
+        let obj = try JSONSerialization.jsonObject(with: Outgoing.selectCaptions(tab: 4, trackID: "", slot: 2).json()) as? [String: Any]
+        #expect(obj?["slot"] as? Int == 2)
+        #expect(obj?["trackId"] as? String == "")
     }
 }

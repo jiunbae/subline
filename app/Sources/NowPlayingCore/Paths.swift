@@ -3,7 +3,25 @@ import Foundation
 public enum NPPaths {
     public static let bundleID = "com.nowplaying.app"
     public static let hostName = "com.nowplaying.host"
+    /// Development (unpacked) extension ID, fixed by the `key` in extension/manifest.json.
     public static let extensionID = "npkfiaebcfackgbinodgjobdlmeceaij"
+
+    /// Chrome Web Store ID, baked into Info.plist (`NPStoreExtensionID`) at build time once published.
+    public static var storeExtensionID: String? {
+        validExtensionID(Bundle.main.object(forInfoDictionaryKey: "NPStoreExtensionID") as? String)
+    }
+
+    /// Chrome extension IDs are 32 characters in a–p.
+    public static func validExtensionID(_ id: String?) -> String? {
+        guard let id, id.count == 32, id.allSatisfy({ ("a"..."p").contains($0) }) else { return nil }
+        return id
+    }
+
+    /// Every extension ID allowed to talk to the native host.
+    public static var allowedExtensionIDs: [String] { [extensionID] + (storeExtensionID.map { [$0] } ?? []) }
+
+    /// Stable copy of the bundled extension for "Load unpacked" (survives app updates/moves).
+    public static var unpackedExtensionDir: URL { supportDir.appendingPathComponent("extension", isDirectory: true) }
 
     public static var supportDir: URL {
         FileManager.default.homeDirectoryForCurrentUser
