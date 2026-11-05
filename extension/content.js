@@ -56,7 +56,12 @@
   }
   function liveCaption() {
     if (!track || track.isAd || cues?.cues?.length) return;
-    const text = [...document.querySelectorAll('.ytp-caption-segment')].map(n => n.textContent).join('\n').trim();
+    // The player briefly shows the track name ("English (auto-generated)", "Click ⚙ for settings")
+    // in the caption area when CC turns on; that is not a caption.
+    const names = new Set((captionTrackList() || []).map(t => t.name));
+    const banner = /click .*for settings|설정하려면|設定/i;
+    const text = [...document.querySelectorAll('.ytp-caption-segment')].map(n => n.textContent.trim())
+      .filter(line => line && !names.has(line) && !banner.test(line)).join('\n').trim();
     if (text !== captionText) { captionText = text; send({type:'liveCaption', videoId:track.videoId, text}); }
   }
   function observers() {
@@ -108,10 +113,12 @@
   function sendCaptionTracks(force = false) {
     const tracks = captionTrackList();
     if (!tracks || track.isAd) return;
-    const sig = JSON.stringify(tracks);
+    // Translation targets only make sense when the video has a caption track to translate.
+    const translations = tracks.length && Array.isArray(main.data?.translationLanguages) ? main.data.translationLanguages : [];
+    const sig = JSON.stringify([tracks, translations.length]);
     if (!force && sig === tracksSig) return;
     tracksSig = sig;
-    send({type:'captionTracks', videoId:track.videoId, tracks});
+    send({type:'captionTracks', videoId:track.videoId, tracks, translations});
   }
   function beginLyrics() {
     if (!music || !track || track.isAd || !track.title || !track.artist || track.duration <= 0 || lyricsAttempt === track.videoId) return;
@@ -171,18 +178,19 @@
     // file listed in several content_scripts entries only once per frame (into MAIN first).
     const normalized = m.cues.filter(c => c && Number.isFinite(c.s) && typeof c.text === 'string' && c.text)
       .slice(0, 20000).map(c => ({s: c.s, ...(Number.isFinite(c.e) ? {e: c.e} : {}), text: c.text.slice(0, 10000)}));
-    const key = (typeof m.lang === 'string' ? m.lang.slice(0,24) : '') + (m.trackKind === 'asr' ? ':asr' : '');
+    const lang = typeof m.lang === 'string' ? m.lang.slice(0,24) : '';
+    const key = m.translated ? 'x-' + lang : lang + (m.trackKind === 'asr' ? ':asr' : '');
     if (m.kind === 'captions' && secondaryTrack && key === secondaryTrack && key !== preferredTrack) {
       if (!normalized.length) return;
       secondaryCues = {type:'cues', videoId:track.videoId, source:'yt-captions', lang:m.lang.slice(0,40),
-        kind:m.trackKind === 'asr' ? 'asr' : 'manual', synced:true, slot:2, cues:normalized};
+        kind:m.trackKind === 'asr' ? 'asr' : 'manual', synced:true, slot:2, trackId:key, cues:normalized};
       send(secondaryCues);
       return;
     }
     // Once the user picked a track in the app, ignore the player's other fetches (e.g. restoring its own track).
     if (m.kind === 'captions' && preferredTrack && key !== preferredTrack) return;
     if (m.kind === 'captions' && normalized.length) emitCues({type:'cues', videoId:track.videoId,
-      source:'yt-captions', lang:typeof m.lang === 'string' ? m.lang.slice(0,40) : '',
+      source:'yt-captions', lang:typeof m.lang === 'string' ? m.lang.slice(0,40) : '', trackId:key,
       kind:m.trackKind === 'asr' ? 'asr' : 'manual', synced:true, cues:normalized});
     if (m.kind === 'lyrics') {
       clearTimeout(lyricTimer);

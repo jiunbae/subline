@@ -18,6 +18,7 @@ public struct TabState: Sendable, Equatable {
     public var secondaryTimeline: CueTimeline = .empty
     public var liveCaption: String?
     public var captionTracks: [CaptionTrack] = []
+    public var translations: [CaptionTrack] = []
     /// True once the extension reported the track list for this video (it may be empty: no captions).
     public var captionTracksKnown = false
     public var lastSeq: Int = Int.min
@@ -55,7 +56,7 @@ public struct SessionStore: Sendable {
             return mutate(TabKey(conn: conn, tab: tab), seq: seq, now: now) { s in
                 if s.track?.videoId != info.videoId {
                     // New video: nothing from the previous one may leak (clock, cues, captions).
-                    s.cueSet = nil; s.timeline = .empty; s.liveCaption = nil; s.captionTracks = []; s.captionTracksKnown = false
+                    s.cueSet = nil; s.timeline = .empty; s.liveCaption = nil; s.captionTracks = []; s.translations = []; s.captionTracksKnown = false
                     s.secondaryCueSet = nil; s.secondaryTimeline = .empty
                     s.clock = nil; s.startedAt = 0
                 }
@@ -83,6 +84,7 @@ public struct SessionStore: Sendable {
         case let .captionTracks(tab, seq, list):
             return mutate(TabKey(conn: conn, tab: tab), seq: seq, now: now, videoId: list.videoId) { s in
                 s.captionTracks = Array(list.tracks.prefix(200))
+                s.translations = Array((list.translations ?? []).prefix(200))
                 s.captionTracksKnown = true
             }
         case let .liveCaption(tab, seq, lc):

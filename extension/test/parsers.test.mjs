@@ -45,3 +45,26 @@ test('mobile timedLyrics nested renderer converts string millisecond values', ()
     {lyricLine:'no timing'}]}}}), [{s:1.2,e:2.4,text:'A'}]);
   assert.deepEqual(parseTimedLyrics({lyrics:'unsynced'}), []);
 });
+test('ASR word stream is regrouped into sentences instead of YouTube rolling windows', () => {
+  const words = (start, list) => ({tStartMs:start, dDurationMs:9000, wWinId:1,
+    segs:list.map(([text, off]) => off === undefined ? {utf8:text} : {utf8:text, tOffsetMs:off})});
+  const json = {events:[
+    {tStartMs:0, dDurationMs:60000},                                  // window header
+    words(1000, [['오늘은',], [' 날씨가', 300], [' 좋네요.', 700], [' 그런데', 1500]]),
+    {tStartMs:3000, dDurationMs:500, wWinId:1, aAppend:1, segs:[{utf8:'\n'}]},
+    words(3010, [[' 비가', ], [' 온대요', 400]]),                          // continues the sentence across the window
+    words(9000, [['Next', ], [' one', 200]]),                          // > 4 s pause: new line
+  ]};
+  const cues = parseJSON3(json, true);
+  assert.deepEqual(cues.map(c => c.text), ['오늘은 날씨가 좋네요.', '그런데 비가 온대요', 'Next one']);
+  assert.equal(cues[0].s, 1); assert.equal(cues[1].s, 2.5);
+  assert.ok(cues.every((c, i) => !cues[i + 1] || (c.e ?? c.s) <= cues[i + 1].s));
+});
+test('ASR lines split when they get long and keep short fragments joined over short pauses', () => {
+  const segs = Array.from({length: 30}, (_, i) => ({utf8: '가', tOffsetMs: i * 100}));
+  const long = parseJSON3({events:[{tStartMs:0, dDurationMs:5000, segs}]}, true);
+  assert.equal(long.length, 2);
+  assert.equal(long[0].text.length, 26);
+  const frag = parseJSON3({events:[{tStartMs:0, dDurationMs:9000, segs:[{utf8:'知る'}, {utf8:'戻れないよ', tOffsetMs:2000}]}]}, true);
+  assert.deepEqual(frag.map(c => c.text), ['知る戻れないよ']);
+});

@@ -91,6 +91,8 @@ final class PlayerModel {
     private(set) var liveCaption: String?
     /// Caption tracks the YouTube player offers for this video, and the one currently shown.
     private(set) var captionTracks: [CaptionTrack] = []
+    /// Auto-translation targets ("x-<lang>") the player offers for this video.
+    private(set) var translations: [CaptionTrack] = []
     private(set) var captionTrackID: String?
     /// A caption fetch was requested and nothing has arrived yet.
     private(set) var captionsLoading = false
@@ -273,7 +275,16 @@ final class PlayerModel {
 
     /// Best track for the remembered choice: exact id, else same language (manual before auto-generated).
     func preferredTrack(in tracks: [CaptionTrack]) -> CaptionTrack? {
-        CaptionTrack.best(for: preferredCaptionID, in: tracks)
+        CaptionTrack.best(for: preferredCaptionID, in: tracks + (store.active?.translations ?? []))
+    }
+
+    /// Display name for a track id (native or "x-<lang>" translation).
+    func trackName(_ id: String?) -> String? {
+        guard let id else { return nil }
+        if let t = (captionTracks + translations).first(where: { $0.id == id }) {
+            return t.isTranslation ? "\(t.name) (auto-translated)" : t.name
+        }
+        return id
     }
 
     private func setLoading(_ on: Bool) {
@@ -310,6 +321,7 @@ final class PlayerModel {
             assign(\.secondaryByRow, [])
             assign(\.liveCaption, nil)
             assign(\.captionTracks, [])
+            assign(\.translations, [])
             assign(\.captionTrackID, nil)
             setLoading(false)
             timer?.cancel()
@@ -345,6 +357,7 @@ final class PlayerModel {
         assign(\.cueSource, cueSet?.source)
         assign(\.liveCaption, (t.isAd ?? false) ? nil : s.liveCaption)
         assign(\.captionTracks, s.captionTracks)
+        assign(\.translations, s.translations)
         assign(\.captionTrackID, cueSet?.trackID)
         if captionsLoading, !cues.isEmpty || liveCaption != nil {
             // Done once the requested track (or any text, when none was specified) is here.
@@ -375,7 +388,7 @@ final class PlayerModel {
     private func applySecondaryPreference(_ s: TabState, _ t: TrackInfo) {
         guard t.site == "yt", !(t.isAd ?? false), s.isPlaying, secondarySent[t.videoId] == nil,
               captionTrackID != nil, !captionsLoading,
-              let target = CaptionTrack.best(for: preferredSecondaryID, in: s.captionTracks),
+              let target = CaptionTrack.best(for: preferredSecondaryID, in: s.captionTracks + s.translations),
               target.id != captionTrackID else { return }
         if secondarySent.count > 64 { secondarySent.removeAll() }
         selectSecondary(target.id, remember: false)

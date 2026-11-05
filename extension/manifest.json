@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Now Playing Overlay",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Send YouTube playback, artwork and captions to the Now Playing macOS overlay.",
   "icons": {
     "16": "icons/icon16.png",

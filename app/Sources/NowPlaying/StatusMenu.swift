@@ -215,6 +215,29 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
             i.state = model.captionTrackID == t.id ? .on : .off
             m.addItem(i)
         }
+        addTranslations(to: m, current: model.captionTrackID, action: #selector(pickCaption(_:)))
+    }
+
+    /// "Auto-translate ▸" submenu: the user's system languages first, then everything YouTube offers.
+    private func addTranslations(to m: NSMenu, current: String?, action: Selector) {
+        guard !model.translations.isEmpty else { return }
+        let item = NSMenuItem(title: "Auto-translate", action: nil, keyEquivalent: "")
+        let sub = NSMenu(); sub.autoenablesItems = false
+        let preferred = Locale.preferredLanguages.compactMap { Locale(identifier: $0).language.languageCode?.identifier }
+        let top = preferred.compactMap { code in model.translations.first { $0.lang == code || $0.lang.hasPrefix(code + "-") } }
+        func add(_ t: CaptionTrack) {
+            let i = NSMenuItem(title: Self.fit(t.name), action: action, keyEquivalent: "")
+            i.target = self; i.representedObject = t.id
+            i.state = current == t.id ? .on : .off
+            sub.addItem(i)
+        }
+        var seen = Set<String>()
+        for t in top where seen.insert(t.id).inserted { add(t) }
+        if !seen.isEmpty { sub.addItem(.separator()) }
+        for t in model.translations where !seen.contains(t.id) { add(t) }
+        item.submenu = sub
+        if current?.hasPrefix("x-") == true { item.state = .on }
+        m.addItem(item)
     }
 
     /// Second caption track shown under the main one; the main track itself is not offered.
@@ -232,6 +255,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
             i.state = model.secondaryTrackID == t.id ? .on : .off
             m.addItem(i)
         }
+        addTranslations(to: m, current: model.secondaryTrackID, action: #selector(pickSecondary(_:)))
     }
 
     @objc private func resumeRecent(_ s: NSMenuItem) {

@@ -95,16 +95,22 @@ function sanitize(raw) {
   }
   if (raw.type === 'clock' && Number.isFinite(raw.t) && Number.isFinite(raw.rate)) return {...common,
     t:Math.max(0,raw.t), rate:raw.rate, paused:raw.paused === true, buffering:raw.buffering === true};
-  if (raw.type === 'captionTracks' && Array.isArray(raw.tracks)) return {...common, tracks: raw.tracks.slice(0,100)
-    .filter(t => t && typeof t.id === 'string' && TRACK_ID.test(t.id) && typeof t.lang === 'string')
-    .map(t => ({id:t.id, lang:str(t.lang,24), name:str(t.name,80) || t.lang, ...(t.kind === 'asr' ? {kind:'asr'} : {})}))};
+  if (raw.type === 'captionTracks' && Array.isArray(raw.tracks)) {
+    const clean = (list, max) => (Array.isArray(list) ? list : []).slice(0, max)
+      .filter(t => t && typeof t.id === 'string' && TRACK_ID.test(t.id) && typeof t.lang === 'string')
+      .map(t => ({id:t.id, lang:str(t.lang,24), name:str(t.name,80) || t.lang,
+        ...(t.kind === 'asr' ? {kind:'asr'} : t.kind === 'translation' ? {kind:'translation'} : {})}));
+    return {...common, tracks: clean(raw.tracks, 100),
+      translations: clean(raw.translations, 200).filter(t => t.id.startsWith('x-') && t.kind === 'translation')};
+  }
   if (raw.type === 'liveCaption') return {...common,text:str(raw.text,10000)};
   if (raw.type === 'cues' && ['yt-captions','ytm-lyrics','lrclib','dom'].includes(raw.source) &&
     ['manual','asr','lyrics'].includes(raw.kind) && Array.isArray(raw.cues) && raw.cues.length <= 20000) {
     const cues = NPParsers.normalizeCues(raw.cues.filter(c => c && typeof c === 'object')
       .map(c => ({s:c.s,e:c.e,text:str(c.text,10000)})));
     const message = {...common,source:raw.source,kind:raw.kind,lang:str(raw.lang,40),synced:raw.synced === true,cues,
-      ...(raw.slot === 2 ? {slot:2} : {})};
+      ...(raw.slot === 2 ? {slot:2} : {}),
+      ...(typeof raw.trackId === 'string' && TRACK_ID.test(raw.trackId) ? {trackId:raw.trackId} : {})};
     return JSON.stringify(message).length < 900000 ? message : null;
   }
   return null;

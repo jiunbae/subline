@@ -35,8 +35,49 @@
     }
     return out.filter(c => c.e === undefined || c.e > c.s).slice(0, 20000);
   }
+  // Auto-generated (ASR) json3 carries one timestamp per word, laid out by YouTube in rolling
+  // windows that cut sentences anywhere. Rebuild lines from the word stream instead: break at
+  // sentence punctuation, at pauses, or when a line gets long.
+  const CJK = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/;
+  function groupASRWords(events) {
+    const words = [];
+    for (const event of events) {
+      if (!event || event.aAppend || !Array.isArray(event.segs) || !Number.isFinite(event.tStartMs)) continue;
+      const end = Number.isFinite(event.dDurationMs) ? (event.tStartMs + event.dDurationMs) / 1000 : undefined;
+      for (const seg of event.segs) {
+        const text = typeof seg?.utf8 === 'string' ? seg.utf8.replace(/\u200b/g, '') : '';
+        if (!text.trim()) continue;
+        words.push({t: (event.tStartMs + (Number(seg.tOffsetMs) || 0)) / 1000, text, end});
+      }
+    }
+    words.sort((a, b) => a.t - b.t);
+    const lines = [];
+    let cur = null;
+    const flush = () => { if (cur && cur.text.trim()) lines.push(cur); cur = null; };
+    for (const w of words) {
+      if (cur) {                                                    // a pause ends the line,
+        const t = cur.text.trim(), short = t.length < (CJK.test(t) ? 8 : 16); // unless it's still a fragment
+        const gap = w.t - cur.last;
+        if (gap > 4 || (gap > 1.2 && !short)) flush();
+      }
+      if (!cur) cur = {s: w.t, text: '', last: w.t, end: w.end};
+      cur.text += w.text; cur.last = w.t; cur.end = w.end;
+      const t = cur.text.trim(), max = CJK.test(t) ? 26 : 48;
+      if (/[.?!。？！…]["'”’)\]]?$/.test(t) || t.length >= max) flush();
+    }
+    flush();
+    return lines.map((l, i) => {
+      const next = lines[i + 1]?.s ?? Infinity;
+      const e = Math.min(next, Math.max(l.last + 0.9, l.s + 0.6), l.end ?? Infinity);
+      return {s: l.s, ...(e > l.s ? {e} : {}), text: l.text.trim().replace(/\s+/g, ' ')};
+    });
+  }
   function parseJSON3(data, asr = false) {
     if (typeof data === 'string') { try { data = JSON.parse(data); } catch { return []; } }
+    const events = Array.isArray(data?.events) ? data.events : [];
+    if (asr && events.some(e => Array.isArray(e?.segs) && e.segs.some(s => Number.isFinite(Number(s?.tOffsetMs)) && s?.tOffsetMs !== undefined))) {
+      return normalizeCues(groupASRWords(events));
+    }
     const rows = [];
     for (const event of Array.isArray(data?.events) ? data.events : []) {
       if (!event || typeof event !== 'object') continue;

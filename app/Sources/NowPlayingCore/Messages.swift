@@ -42,9 +42,15 @@ public struct CueSet: Codable, Sendable, Equatable {
     public var cues: [Cue]
     /// 2 for the secondary ("sub") caption track; nil/1 for the main text.
     public var slot: Int?
+    /// Caption track id as chosen in the extension (includes "x-<lang>" translations).
+    public var trackId: String?
     public init(videoId: String, source: String, lang: String?, kind: String, synced: Bool, cues: [Cue], slot: Int? = nil) {
         self.videoId = videoId; self.source = source; self.lang = lang; self.kind = kind
         self.synced = synced; self.cues = cues; self.slot = slot
+    }
+    public init(videoId: String, source: String, lang: String?, kind: String, synced: Bool, cues: [Cue], slot: Int?, trackId: String?) {
+        self.init(videoId: videoId, source: source, lang: lang, kind: kind, synced: synced, cues: cues, slot: slot)
+        self.trackId = trackId
     }
     public var isSecondary: Bool { slot == 2 }
 }
@@ -60,16 +66,22 @@ public struct CaptionTrack: Codable, Sendable, Equatable, Identifiable {
         self.id = id; self.lang = lang; self.name = name; self.kind = kind
     }
     public var isAuto: Bool { kind == "asr" }
+    /// Auto-translation target ("x-<lang>"): the player translates its current track.
+    public var isTranslation: Bool { kind == "translation" }
 
     /// Best track for a remembered choice: exact id, else the same language (then the same base
     /// language, e.g. "en" for "en-GB"), preferring manual tracks over auto-generated ones.
     public static func best(for preferred: String?, in tracks: [CaptionTrack]) -> CaptionTrack? {
         guard let preferred, !tracks.isEmpty else { return nil }
         if let exact = tracks.first(where: { $0.id == preferred }) { return exact }
-        let lang = preferred.replacingOccurrences(of: ":asr", with: "")
+        // A wanted translation ("x-ko") is satisfied by a native track in that language; translations
+        // themselves are only ever chosen by exact id (a native auto-generated track beats them).
+        var lang = preferred.replacingOccurrences(of: ":asr", with: "")
+        if lang.hasPrefix("x-") { lang.removeFirst(2) }
         let base = lang.split(separator: "-").first.map(String.init) ?? lang
-        let sameLang = tracks.filter { $0.lang == lang }
-        let sameBase = tracks.filter { $0.lang != lang && ($0.lang == base || $0.lang.hasPrefix(base + "-")) }
+        let native = tracks.filter { !$0.isTranslation }
+        let sameLang = native.filter { $0.lang == lang }
+        let sameBase = native.filter { $0.lang != lang && ($0.lang == base || $0.lang.hasPrefix(base + "-")) }
         let candidates = sameLang + sameBase
         return candidates.first(where: { !$0.isAuto }) ?? candidates.first
     }
@@ -78,12 +90,16 @@ public struct CaptionTrack: Codable, Sendable, Equatable, Identifiable {
 public struct CaptionTrackList: Codable, Sendable, Equatable {
     public var videoId: String
     public var tracks: [CaptionTrack]
+    /// Languages the player can auto-translate into (absent from older extensions).
+    public var translations: [CaptionTrack]?
 }
 
 extension CueSet {
     /// Caption track id of this set (matches `CaptionTrack.id`), nil for lyrics.
     public var trackID: String? {
-        guard source == "yt-captions", let lang, !lang.isEmpty else { return nil }
+        guard source == "yt-captions" else { return nil }
+        if let trackId, !trackId.isEmpty { return trackId }
+        guard let lang, !lang.isEmpty else { return nil }
         return kind == "asr" ? "\(lang):asr" : lang
     }
 }

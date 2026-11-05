@@ -142,3 +142,13 @@ test('secondary caption slot is forwarded, kept apart from main cues in snapshot
   await flush();
   assert.deepEqual(h.sent.filter(m=>m.type==='selectCaptions').map(m=>[m.trackId,m.slot]),[['',2]]);
 });
+test('translation targets are forwarded only as x-<lang> translation entries; cue trackId is validated',async()=>{
+  const h=harness(); await flush(); h.publish(track);
+  h.publish({type:'captionTracks',videoId:track.videoId,tracks:[{id:'en',lang:'en',name:'English'}],
+    translations:[{id:'x-ko',lang:'ko',name:'Korean',kind:'translation'},{id:'ko',lang:'ko',name:'spoof',kind:'translation'},{id:'x-ja',lang:'ja',name:'Japanese'}]});
+  assert.deepEqual(h.messages.at(-1).translations,[{id:'x-ko',lang:'ko',name:'Korean',kind:'translation'}]);
+  h.publish({type:'cues',videoId:track.videoId,source:'yt-captions',lang:'ko',kind:'manual',synced:true,slot:2,trackId:'x-ko',cues:[{s:1,e:2,text:'안녕'}]});
+  assert.equal(h.messages.at(-1).trackId,'x-ko');
+  h.publish({type:'cues',videoId:track.videoId,source:'yt-captions',lang:'ko',kind:'manual',synced:true,trackId:'bad id',cues:[{s:1,e:2,text:'x'}]});
+  assert.equal(h.messages.at(-1).trackId,undefined);
+});

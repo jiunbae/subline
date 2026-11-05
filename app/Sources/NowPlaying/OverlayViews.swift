@@ -838,7 +838,7 @@ struct HoverChrome: View {
             VStack {
                 HStack(spacing: 6) {
                     Spacer()
-                    if model.captionTracks.count > 1 {
+                    if model.captionTracks.count > 1 || !model.translations.isEmpty {
                         CaptionPill(model: model, compact: layout == .mini || size.height < 100)
                     }
                     Controls(model: model, compact: layout == .mini || size.height < 100)
@@ -891,7 +891,8 @@ struct CaptionPill: View {
             HStack(spacing: 3) {
                 Image(systemName: "captions.bubble.fill")
                 Text(([model.captionTrackID ?? "CC"] + (model.secondaryTrackID.map { [$0] } ?? []))
-                    .map { $0.replacingOccurrences(of: ":asr", with: "·A").uppercased() }.joined(separator: "+"))
+                    .map { $0.replacingOccurrences(of: ":asr", with: "·A").replacingOccurrences(of: "x-", with: "→").uppercased() }
+                    .joined(separator: "+"))
             }
             .font(.system(size: compact ? 9.5 : 11, weight: .semibold))
             .padding(.horizontal, 8).frame(height: compact ? 24 : 28)

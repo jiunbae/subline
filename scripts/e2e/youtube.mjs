@@ -19,8 +19,20 @@ fs.writeFileSync(path.join(UD, 'NativeMessagingHosts/com.nowplaying.host.json'),
   name: 'com.nowplaying.host', description: 'e2e', path: path.join(os.homedir(), 'Applications/NowPlaying.app/Contents/Helpers/np-host'),
   type: 'stdio', allowed_origins: ['chrome-extension://npkfiaebcfackgbinodgjobdlmeceaij/'] }));
 const ext = path.join(root, 'extension');
+// Playwright's bundled Chromium, falling back to the newest one already downloaded.
+function chromePath() {
+  if (process.env.CHROME) return process.env.CHROME;
+  try { const p = chromium.executablePath(); if (fs.existsSync(p)) return p; } catch {}
+  const cache = path.join(os.homedir(), 'Library/Caches/ms-playwright');
+  const dirs = fs.existsSync(cache) ? fs.readdirSync(cache).filter(d => d.startsWith('chromium-')).sort().reverse() : [];
+  for (const d of dirs) {
+    const p = path.join(cache, d, 'chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing');
+    if (fs.existsSync(p)) return p;
+  }
+  return undefined;
+}
 const ctx = await chromium.launchPersistentContext(UD, {
-  ...(process.env.CHROME ? { executablePath: process.env.CHROME } : {}), headless: false, viewport: { width: 1100, height: 700 },
+  ...(chromePath() ? { executablePath: chromePath() } : {}), headless: false, viewport: { width: 1100, height: 700 },
   ignoreDefaultArgs: ['--disable-extensions', '--mute-audio', '--enable-automation'],
   args: [`--disable-extensions-except=${ext}`, `--load-extension=${ext}`, '--autoplay-policy=no-user-gesture-required',
          '--window-position=0,0', '--disable-blink-features=AutomationControlled'],

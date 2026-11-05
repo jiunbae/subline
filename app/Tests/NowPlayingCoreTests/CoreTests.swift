@@ -268,3 +268,27 @@ import Foundation
         #expect(obj?["trackId"] as? String == "")
     }
 }
+
+@Suite struct TranslationTests {
+    let tracks = [CaptionTrack(id: "en", lang: "en", name: "English"),
+                  CaptionTrack(id: "ko:asr", lang: "ko", name: "Korean (auto-generated)", kind: "asr"),
+                  CaptionTrack(id: "x-ko", lang: "ko", name: "Korean", kind: "translation"),
+                  CaptionTrack(id: "x-ja", lang: "ja", name: "Japanese", kind: "translation")]
+
+    @Test func translationsOnlyByExactIdAndNativeWins() {
+        #expect(CaptionTrack.best(for: "ko", in: tracks)?.id == "ko:asr")   // native auto beats translation
+        #expect(CaptionTrack.best(for: "x-ja", in: tracks)?.id == "x-ja")   // exact translation
+        #expect(CaptionTrack.best(for: "x-ko", in: tracks)?.id == "x-ko")
+        #expect(CaptionTrack.best(for: "x-en", in: tracks)?.id == "en")     // native track satisfies a wanted translation
+        #expect(CaptionTrack.best(for: "ja", in: tracks) == nil)            // no native Japanese: not silently translated
+    }
+
+    @Test func explicitTrackIdWinsForCueSets() throws {
+        let json = #"{"v":1,"type":"cues","tabId":1,"seq":2,"videoId":"v","source":"yt-captions","lang":"ko","kind":"manual","synced":true,"slot":2,"trackId":"x-ko","cues":[{"s":1,"text":"안녕"}]}"#
+        guard case let .cues(_, _, set) = try Incoming.parse(Data(json.utf8)) else { Issue.record("wrong case"); return }
+        #expect(set.trackID == "x-ko" && set.isSecondary)
+        let list = #"{"v":1,"type":"captionTracks","tabId":1,"videoId":"v","tracks":[],"translations":[{"id":"x-ko","lang":"ko","name":"Korean","kind":"translation"}]}"#
+        guard case let .captionTracks(_, _, l) = try Incoming.parse(Data(list.utf8)) else { Issue.record("wrong case"); return }
+        #expect(l.translations?.first?.isTranslation == true)
+    }
+}

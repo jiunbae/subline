@@ -10,6 +10,7 @@ pkill -x NowPlaying || true; sleep 0.5
 rm -rf ~/Applications/NowPlaying.app && cp -R "$ROOT/build/NowPlaying.app" ~/Applications/
 defaults write $D layout $LAYOUT; defaults write $D style $STYLE
 open -g ~/Applications/NowPlaying.app; sleep 3
+python3 "$ROOT/scripts/perf/recents.py" save "$ROOT/build/recents.bak"   # synthetic tracks must not pollute Recently Played
 P=$(pgrep -x NowPlaying)
 secs() { /bin/ps -o time= -p $P | awk -F'[:.]' '{ if (NF==3) print $1*60+$2+$3/100; else print $1*3600+$2*60+$3+$4/100 }'; }
 python3 "$ROOT/scripts/perf/feed.py" $MODE $((SECS + 12)) >/dev/null 2>&1 &
@@ -17,3 +18,4 @@ sleep 10; a=$(secs); sleep $SECS; b=$(secs); wait
 FP=$(footprint $P 2>/dev/null | sed -n 2p | sed 's/.*Footprint: //;s/ (.*//')
 echo "$MODE $LAYOUT/$STYLE: cpu=$(echo "scale=2; ($b-$a)*100/$SECS" | bc)% footprint=$FP"
 pkill -x NowPlaying; sleep 0.5; defaults write $D layout $OLD_L; defaults write $D style $OLD_S; open -g ~/Applications/NowPlaying.app
+pkill -x NowPlaying; sleep 0.5; python3 "$ROOT/scripts/perf/recents.py" restore "$ROOT/build/recents.bak"; open -g ~/Applications/NowPlaying.app

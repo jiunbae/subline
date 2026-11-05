@@ -25,6 +25,7 @@
         duration: Number(valid?.lengthSeconds) || 0,
         thumbnails: valid?.thumbnail?.thumbnails || [],
         captionTracks: valid ? captionTracks(response) : [],
+        translationLanguages: valid ? translationLanguages(response) : [],
         isAd: !!p?.classList?.contains('ad-showing')
       }});
     } catch { /* DOM-only adapter remains available. */ }
@@ -39,6 +40,16 @@
       name: String(t.name?.simpleText || (t.name?.runs || []).map(r => r.text).join('') || t.languageCode || '').slice(0, 80),
       ...(t.kind === 'asr' ? {kind: 'asr'} : {})
     })).filter((t, i, all) => /^[A-Za-z0-9_-]{1,24}(:asr)?$/.test(t.id) && all.findIndex(o => o.id === t.id) === i);
+  }
+  // Languages the player can auto-translate captions into; selectable as track id "x-<lang>".
+  function translationLanguages(response) {
+    const list = response?.captions?.playerCaptionsTracklistRenderer?.translationLanguages;
+    if (!Array.isArray(list)) return [];
+    return list.slice(0, 200).map(t => ({
+      id: 'x-' + (t.languageCode || ''), lang: t.languageCode || '',
+      name: String(t.languageName?.simpleText || (t.languageName?.runs || []).map(r => r.text).join('') || t.languageCode || '').slice(0, 80),
+      kind: 'translation'
+    })).filter(t => /^[A-Za-z0-9_-]{1,24}$/.test(t.id));
   }
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   // The player does not refetch a track it already loaded, so keep the last few captured tracks.
@@ -73,9 +84,21 @@
       if (videoId() !== id) return;
       // Restored afterwards: setOption also changes the player's remembered caption language.
       const original = simple(current());
+      const translateTo = trackId.startsWith('x-') ? trackId.slice(2) : '';
       const [lang, asr] = [trackId.replace(/:asr$/, ''), trackId.endsWith(':asr')];
-      const want = {languageCode: lang, ...(asr ? {kind: 'asr'} : {})};
-      const isWanted = () => current()?.languageCode === lang && (current()?.kind === 'asr') === asr;
+      let want, isWanted;
+      if (translateTo) {
+        // Auto-translate the player's current track (or its first manual one) into `translateTo`.
+        let list = [];
+        try { list = p.getOption('captions', 'tracklist') || []; } catch {}
+        const base = simple(current()) || simple(list.find(t => t?.kind !== 'asr')) || simple(list[0]);
+        if (!base) return;
+        want = {...base, translationLanguage: {languageCode: translateTo}};
+        isWanted = () => current()?.translationLanguage?.languageCode === translateTo;
+      } else {
+        want = {languageCode: lang, ...(asr ? {kind: 'asr'} : {})};
+        isWanted = () => current()?.languageCode === lang && (current()?.kind === 'asr') === asr && !current()?.translationLanguage;
+      }
       // The track list may still be loading right after navigation.
       for (let i = 0; i < 12 && videoId() === id && !isWanted(); i++) {
         // Only the plain {languageCode, kind} form is honored; a full track object is ignored.
@@ -89,7 +112,7 @@
         if (got) post('captions', {videoId: id, ...got}); // re-post in case it raced the app's choice
       }
       if (videoId() !== id || !button.isConnected) return;
-      if (original && (original.languageCode !== lang || (original.kind === 'asr') !== asr)) {
+      if (original && (translateTo || original.languageCode !== lang || (original.kind === 'asr') !== asr)) {
         try { p.setOption('captions', 'track', original); } catch {}
         await sleep(150);
       }
@@ -121,10 +144,11 @@
       const cues = text.trimStart().startsWith('{') ? NPParsers.parseJSON3(text, asr) : parseXML(text, asr);
       // Auto-translated responses carry the target language in tlang.
       const lang = url.searchParams.get('tlang') || url.searchParams.get('lang') || '';
-      const trackKind = asr && !url.searchParams.get('tlang') ? 'asr' : 'manual';
+      const translated = !!url.searchParams.get('tlang');
+      const trackKind = asr && !translated ? 'asr' : 'manual';
       if (cues.length) {
-        remember(id, lang + (trackKind === 'asr' ? ':asr' : ''), {cues, lang, trackKind});
-        post('captions', {videoId: id, cues, lang, trackKind, translated: !!url.searchParams.get('tlang')});
+        remember(id, translated ? 'x-' + lang : lang + (trackKind === 'asr' ? ':asr' : ''), {cues, lang, trackKind, translated});
+        post('captions', {videoId: id, cues, lang, trackKind, translated});
       }
     }
   }
