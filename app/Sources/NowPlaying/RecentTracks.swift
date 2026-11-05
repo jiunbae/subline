@@ -18,7 +18,8 @@ struct RecentTrack: Codable, Identifiable, Equatable {
     var ago: String {
         let f = RelativeDateTimeFormatter()
         f.unitsStyle = .short
-        return Date().timeIntervalSince(at) < 60 ? "just now" : f.localizedString(for: at, relativeTo: Date())
+        f.locale = L10n.locale
+        return Date().timeIntervalSince(at) < 60 ? L10n.string("just now") : f.localizedString(for: at, relativeTo: Date())
     }
 }
 

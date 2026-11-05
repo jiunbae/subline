@@ -56,7 +56,12 @@ After you quit from the menu, it won't be relaunched automatically until you ope
 | Nothing playing | Shown only when you open the overlay yourself (⌃⌥⌘O): the last video with ▶ resume (plays in its tab if still open, otherwise opens it in the default browser) and up to 3 more recent ones. Menu bar → Recently Played lists them and can clear the list (kept on this Mac only) |
 | Paused | The overlay dims and desaturates, with a ❚❚ mark by the title (a pause glyph on Cover); it fades out after 5 min |
 | No text | Cover + Line shows the title larger instead of an empty slot, with a status chip: Loading captions… / Load captions / Show lyrics (unsynced) |
-| Lyrics on YouTube Music | Synced lyrics from LRCLIB (retried with localized/`(Official Audio)` suffixes removed). Otherwise YTM's own lyrics, unsynced (Lyrics layout only) |
+| Lyrics on YouTube Music | Synced lyrics from LRCLIB (retried with localized/`(Official Audio)` suffixes removed, then one LRCLIB search matched by title and length ±3 s, skipping instrumentals). Otherwise YTM's own lyrics, unsynced (Lyrics layout only) |
+
+## Language
+
+The app follows the system language (English and Korean). To use Korean in the app only:
+`defaults write com.nowplaying.app AppleLanguages -array ko` (undo: `defaults delete com.nowplaying.app AppleLanguages`), then reopen it.
 
 ## Verification tools
 

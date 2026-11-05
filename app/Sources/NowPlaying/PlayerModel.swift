@@ -9,10 +9,10 @@ enum OverlayLayout: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .cover: "Cover"
-        case .coverLine: "Cover + Line"
-        case .lyrics: "Lyrics"
-        case .mini: "Mini"
+        case .cover: L10n.string("Cover")
+        case .coverLine: L10n.string("Cover + Line")
+        case .lyrics: L10n.string("Lyrics")
+        case .mini: L10n.string("Mini")
         }
     }
     var defaultSize: CGSize {
@@ -45,9 +45,9 @@ enum OverlayStyle: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .glass: "Glass"
-        case .tinted: "Tinted"
-        case .clear: "Clear"
+        case .glass: L10n.string("Glass")
+        case .tinted: L10n.string("Tinted")
+        case .clear: L10n.string("Clear")
         }
     }
 }
@@ -282,7 +282,7 @@ final class PlayerModel {
     func trackName(_ id: String?) -> String? {
         guard let id else { return nil }
         if let t = (captionTracks + translations).first(where: { $0.id == id }) {
-            return t.isTranslation ? "\(t.name) (auto-translated)" : t.name
+            return t.isTranslation ? L10n.format("%@ (auto-translated)", t.name) : t.name
         }
         return id
     }

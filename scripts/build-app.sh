@@ -13,6 +13,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Helpers" "$APP/Contents/Resources"
 cp "$BIN/NowPlaying" "$APP/Contents/MacOS/NowPlaying"
 cp "$BIN/np-host" "$APP/Contents/Helpers/np-host"
 cp "$ROOT/app/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
+cp -R "$ROOT"/app/Resources/*.lproj "$APP/Contents/Resources/"
 # Bundled extension for the setup window's "Load unpacked" path (tests/docs excluded).
 rsync -a --delete --exclude test --exclude README.md --exclude '.*' "$ROOT/extension/" "$APP/Contents/Resources/extension/"
 # Chrome Web Store ID (after publishing): env STORE_EXTENSION_ID or keys/store-extension-id.txt.
@@ -24,6 +25,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
   <key>CFBundleIdentifier</key><string>com.nowplaying.app</string>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleLocalizations</key><array><string>en</string><string>ko</string></array>
   <key>CFBundleName</key><string>Now Playing</string>
   <key>CFBundleDisplayName</key><string>Now Playing</string>
   <key>CFBundleExecutable</key><string>NowPlaying</string>

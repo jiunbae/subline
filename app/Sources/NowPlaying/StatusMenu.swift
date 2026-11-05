@@ -43,22 +43,22 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         building = menu
         menu.removeAllItems()
 
-        let full = model.hasTrack ? "\(model.title) — \(model.artist)" : "Nothing playing"
+        let full = model.hasTrack ? L10n.format("%@ — %@", model.title, model.artist) : L10n.string("Nothing playing")
         let header = NSMenuItem(title: Self.fit(full), action: nil, keyEquivalent: "")
         header.toolTip = full
         header.isEnabled = false
         menu.addItem(header)
         if model.connectionCount > 0 {
-            let status = NSMenuItem(title: "● Connected to Chrome", action: nil, keyEquivalent: "")
+            let status = NSMenuItem(title: L10n.string("● Connected to Chrome"), action: nil, keyEquivalent: "")
             status.isEnabled = false
             menu.addItem(status)
             if let old = model.extensionOutdated {
                 // Unpacked extensions keep running old code until reloaded in the browser.
-                let warn = NSMenuItem(title: "⚠︎ Extension \(old.running) outdated (\(old.bundled) available)",
+                let warn = NSMenuItem(title: L10n.format("⚠︎ Extension %@ outdated (%@ available)", old.running, old.bundled),
                                       action: nil, keyEquivalent: "")
                 warn.isEnabled = false
                 menu.addItem(warn)
-                let how = NSMenuItem(title: "    Reload it in the browser's Extensions page",
+                let how = NSMenuItem(title: L10n.string("    Reload it in the browser's Extensions page"),
                                      action: nil, keyEquivalent: "")
                 how.isEnabled = false
                 menu.addItem(how)
@@ -81,7 +81,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         let ct = add("Click-Through", #selector(toggleClickThrough), key: "l", mods: [.control, .option, .command])
         ct.state = model.clickThrough ? .on : .off
 
-        let layout = NSMenuItem(title: "Layout", action: nil, keyEquivalent: "")
+        let layout = NSMenuItem(title: L10n.string("Layout"), action: nil, keyEquivalent: "")
         let lm = NSMenu()
         for l in OverlayLayout.allCases {
             let i = NSMenuItem(title: l.title, action: #selector(pickLayout(_:)), keyEquivalent: "")
@@ -92,7 +92,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         layout.submenu = lm
         menu.addItem(layout)
 
-        let style = NSMenuItem(title: "Style", action: nil, keyEquivalent: "")
+        let style = NSMenuItem(title: L10n.string("Style"), action: nil, keyEquivalent: "")
         let sm = NSMenu()
         for st in OverlayStyle.allCases {
             let i = NSMenuItem(title: st.title, action: #selector(pickStyle(_:)), keyEquivalent: "")
@@ -104,7 +104,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         menu.addItem(style)
         add("Appearance…", #selector(openAppearance), key: ",")
 
-        let op = NSMenuItem(title: "Opacity", action: nil, keyEquivalent: "")
+        let op = NSMenuItem(title: L10n.string("Opacity"), action: nil, keyEquivalent: "")
         let om = NSMenu()
         for v in [1.0, 0.85, 0.7, 0.5] {
             let i = NSMenuItem(title: "\(Int(v * 100))%", action: #selector(pickOpacity(_:)), keyEquivalent: "")
@@ -116,46 +116,47 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         menu.addItem(op)
 
         // Captions
-        let cap = NSMenuItem(title: "Captions", action: nil, keyEquivalent: "")
+        let cap = NSMenuItem(title: L10n.string("Captions"), action: nil, keyEquivalent: "")
         let cm = NSMenu()
         if !model.captionTracks.isEmpty {
-            let lang = NSMenuItem(title: "Language", action: nil, keyEquivalent: "")
+            let lang = NSMenuItem(title: L10n.string("Language"), action: nil, keyEquivalent: "")
             let lm = NSMenu(); lm.autoenablesItems = false
             addCaptionLanguages(to: lm)
             lang.submenu = lm
             cm.addItem(lang)
-            let second = NSMenuItem(title: "Second Language", action: nil, keyEquivalent: "")
+            let second = NSMenuItem(title: L10n.string("Second Language"), action: nil, keyEquivalent: "")
             let sm2 = NSMenu(); sm2.autoenablesItems = false
             addSecondaryLanguages(to: sm2)
             second.submenu = sm2
             cm.addItem(second)
             cm.addItem(.separator())
         }
-        let src = NSMenuItem(title: "Source: \(model.cueSource ?? (model.liveCaption != nil ? "on-screen" : "none"))",
+        let source = L10n.string(model.cueSource ?? (model.liveCaption != nil ? "on-screen" : "none"))
+        let src = NSMenuItem(title: L10n.format("Source: %@", source),
                              action: nil, keyEquivalent: "")
         src.isEnabled = false
         cm.addItem(src)
-        let off = NSMenuItem(title: String(format: "Delay: %+.1fs", model.captionOffset), action: nil, keyEquivalent: "")
+        let off = NSMenuItem(title: L10n.format("Delay: %+.1fs", model.captionOffset), action: nil, keyEquivalent: "")
         off.isEnabled = false
         cm.addItem(off)
         for (title, delta) in [("Earlier (−0.5s)", -0.5), ("Later (+0.5s)", 0.5)] {
-            let i = NSMenuItem(title: title, action: #selector(nudge(_:)), keyEquivalent: "")
+            let i = NSMenuItem(title: L10n.string(title), action: #selector(nudge(_:)), keyEquivalent: "")
             i.target = self; i.representedObject = delta
             cm.addItem(i)
         }
-        let reset = NSMenuItem(title: "Reset Offset", action: #selector(resetOffset), keyEquivalent: "")
+        let reset = NSMenuItem(title: L10n.string("Reset Offset"), action: #selector(resetOffset), keyEquivalent: "")
         reset.target = self
         cm.addItem(reset)
         cm.addItem(.separator())
-        let conn = NSMenuItem(title: "Connect Captions on Current Video", action: #selector(connectCaptions), keyEquivalent: "")
+        let conn = NSMenuItem(title: L10n.string("Connect Captions on Current Video"), action: #selector(connectCaptions), keyEquivalent: "")
         conn.target = self
         conn.isEnabled = model.hasTrack
         cm.addItem(conn)
-        let autoCap = NSMenuItem(title: "Auto-Connect Captions", action: #selector(toggleAutoCaptions), keyEquivalent: "")
+        let autoCap = NSMenuItem(title: L10n.string("Auto-Connect Captions"), action: #selector(toggleAutoCaptions), keyEquivalent: "")
         autoCap.target = self
         autoCap.state = model.autoCaptions ? .on : .off
         cm.addItem(autoCap)
-        let nextLine = NSMenuItem(title: "Show Next Line", action: #selector(toggleNextLine), keyEquivalent: "")
+        let nextLine = NSMenuItem(title: L10n.string("Show Next Line"), action: #selector(toggleNextLine), keyEquivalent: "")
         nextLine.target = self
         nextLine.state = model.showNextLine ? .on : .off
         cm.addItem(nextLine)
@@ -165,14 +166,14 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         // Tab selection
         let tabs = model.tabs.filter { $0.track != nil }
         if tabs.count > 1 || model.pinned != nil {
-            let follow = NSMenuItem(title: "Follow", action: nil, keyEquivalent: "")
+            let follow = NSMenuItem(title: L10n.string("Follow"), action: nil, keyEquivalent: "")
             let fm = NSMenu()
-            let auto = NSMenuItem(title: "Automatic (last played)", action: #selector(pickTab(_:)), keyEquivalent: "")
+            let auto = NSMenuItem(title: L10n.string("Automatic (last played)"), action: #selector(pickTab(_:)), keyEquivalent: "")
             auto.target = self; auto.state = model.pinned == nil ? .on : .off
             fm.addItem(auto)
             fm.addItem(.separator())
             for t in tabs {
-                let title = (t.isPlaying ? "▶︎ " : "") + (t.track?.title ?? "Tab \(t.key.tab)")
+                let title = (t.isPlaying ? "▶︎ " : "") + (t.track?.title ?? L10n.format("Tab %d", t.key.tab))
                 let i = NSMenuItem(title: Self.fit(title), action: #selector(pickTab(_:)), keyEquivalent: "")
                 i.toolTip = title
                 i.target = self; i.representedObject = "\(t.key.conn):\(t.key.tab)"
@@ -184,16 +185,16 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         }
 
         if !model.recents.isEmpty {
-            let rec = NSMenuItem(title: "Recently Played", action: nil, keyEquivalent: "")
+            let rec = NSMenuItem(title: L10n.string("Recently Played"), action: nil, keyEquivalent: "")
             let rm = NSMenu(); rm.autoenablesItems = false
             for r in model.recents {
-                let i = NSMenuItem(title: Self.fit("\(r.title) — \(r.artist)"), action: #selector(resumeRecent(_:)), keyEquivalent: "")
-                i.toolTip = "\(r.title) — \(r.artist) · \(r.ago)"
+                let i = NSMenuItem(title: Self.fit(L10n.format("%@ — %@", r.title, r.artist)), action: #selector(resumeRecent(_:)), keyEquivalent: "")
+                i.toolTip = L10n.format("%@ — %@ · %@", r.title, r.artist, r.ago)
                 i.target = self; i.representedObject = r.videoId
                 rm.addItem(i)
             }
             rm.addItem(.separator())
-            let clear = NSMenuItem(title: "Clear Recently Played", action: #selector(clearRecents), keyEquivalent: "")
+            let clear = NSMenuItem(title: L10n.string("Clear Recently Played"), action: #selector(clearRecents), keyEquivalent: "")
             clear.target = self
             rm.addItem(clear)
             rec.submenu = rm
@@ -206,7 +207,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
 
     /// Caption tracks of the current video; the shown one is checked.
     private func addCaptionLanguages(to m: NSMenu) {
-        let header = NSMenuItem(title: "Caption Language", action: nil, keyEquivalent: "")
+        let header = NSMenuItem(title: L10n.string("Caption Language"), action: nil, keyEquivalent: "")
         header.isEnabled = false
         m.addItem(header)
         for t in model.captionTracks {
@@ -221,7 +222,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     /// "Auto-translate ▸" submenu: the user's system languages first, then everything YouTube offers.
     private func addTranslations(to m: NSMenu, current: String?, action: Selector) {
         guard !model.translations.isEmpty else { return }
-        let item = NSMenuItem(title: "Auto-translate", action: nil, keyEquivalent: "")
+        let item = NSMenuItem(title: L10n.string("Auto-translate"), action: nil, keyEquivalent: "")
         let sub = NSMenu(); sub.autoenablesItems = false
         let preferred = Locale.preferredLanguages.compactMap { Locale(identifier: $0).language.languageCode?.identifier }
         let top = preferred.compactMap { code in model.translations.first { $0.lang == code || $0.lang.hasPrefix(code + "-") } }
@@ -242,10 +243,10 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
 
     /// Second caption track shown under the main one; the main track itself is not offered.
     private func addSecondaryLanguages(to m: NSMenu) {
-        let header = NSMenuItem(title: "Second Language", action: nil, keyEquivalent: "")
+        let header = NSMenuItem(title: L10n.string("Second Language"), action: nil, keyEquivalent: "")
         header.isEnabled = false
         m.addItem(header)
-        let off = NSMenuItem(title: "None", action: #selector(pickSecondary(_:)), keyEquivalent: "")
+        let off = NSMenuItem(title: L10n.string("None"), action: #selector(pickSecondary(_:)), keyEquivalent: "")
         off.target = self; off.representedObject = ""
         off.state = model.secondaryTrackID == nil ? .on : .off
         m.addItem(off)
@@ -289,7 +290,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
 
     @discardableResult
     private func add(_ title: String, _ sel: Selector, key: String = "", mods: NSEvent.ModifierFlags = [.command]) -> NSMenuItem {
-        let i = NSMenuItem(title: title, action: sel, keyEquivalent: key)
+        let i = NSMenuItem(title: L10n.string(title), action: sel, keyEquivalent: key)
         i.keyEquivalentModifierMask = mods
         i.target = self
         building.addItem(i)

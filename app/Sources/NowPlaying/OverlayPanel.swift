@@ -17,7 +17,7 @@ final class OverlayPanel: NSPanel {
         isMovableByWindowBackground = false // we move it ourselves to support snapping
         isReleasedWhenClosed = false
         animationBehavior = .utilityWindow
-        title = "Now Playing Overlay" // never drawn (borderless); names the window for accessibility/automation
+        title = L10n.string("Now Playing Overlay") // never drawn (borderless); names the window for accessibility/automation
     }
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }

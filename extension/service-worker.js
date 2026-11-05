@@ -144,6 +144,26 @@ async function lyrics(query) {
       } catch { /* Missing lyrics/rate limiting never affects playback. */ }
       if (result.cues.length) break;
     }
+    // Last resort: LRCLIB search (one request). Takes a synced entry within ±3 s of the track's
+    // length, preferring an exact title, then the artist, then the closest length; skips instrumentals.
+    if (!result.cues.length) {
+      try {
+        const [title, artist] = cleaned;
+        const params = new URLSearchParams({track_name:title, artist_name:artist});
+        const response = await fetch(`https://lrclib.net/api/search?${params}`, {signal:AbortSignal.timeout(7000), credentials:'omit'});
+        if (response.ok) {
+          const list = await response.json();
+          const norm = value => String(value || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+          const score = d => (norm(d.trackName) === norm(title) ? 4 : 0) + (norm(d.artistName).includes(norm(artist)) || norm(artist).includes(norm(d.artistName)) ? 2 : 0)
+            - Math.abs(d.duration - query.duration) / 3;
+          const best = (Array.isArray(list) ? list : []).slice(0, 30)
+            .filter(d => d && !d.instrumental && typeof d.syncedLyrics === 'string' && d.syncedLyrics.length < 500000 &&
+              Number.isFinite(d.duration) && Math.abs(d.duration - query.duration) <= 3 && norm(d.trackName).includes(norm(title).slice(0, 12)))
+            .sort((a, b) => score(b) - score(a))[0];
+          if (best) result = {cues:NPParsers.parseLRC(best.syncedLyrics, query.duration)};
+        }
+      } catch { /* Search is best effort. */ }
+    }
     lyricCache.set(key, {at:Date.now(),result});
     while (lyricCache.size > 24) lyricCache.delete(lyricCache.keys().next().value);
     return result;

@@ -7,7 +7,7 @@ const root = new URL('../', import.meta.url);
 const source = file => readFileSync(new URL(file,root),'utf8');
 const plain = value => JSON.parse(JSON.stringify(value));
 const flush = async () => { for (let i=0;i<8;i++) await Promise.resolve(); };
-function harness() {
+function harness(fetchImpl) {
   const listener = () => ({callbacks:[],addListener(fn) { this.callbacks.push(fn); }});
   const messages=[], sent=[], ports=[], timers=[], fetches=[];
   const tab={id:7,url:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'};
@@ -23,7 +23,8 @@ function harness() {
   const alarms={onAlarm:listener(),create:async()=>{},clear:async()=>{}};
   const context = vm.createContext({chrome:{runtime,tabs,alarms,action:{onClicked:listener()}},navigator:{userAgent:'Node'},
     console,URL,URLSearchParams,AbortSignal,Date,clearTimeout:()=>{},setTimeout:(fn,delay)=>{timers.push({fn,delay});return timers.length;},
-    fetch:async(url, options)=>{fetchCount++;fetches.push({url,options});return {ok:true,json:async()=>({duration:100,syncedLyrics:'[00:01]hello'})};}});
+    fetch:async(url, options)=>{fetchCount++;fetches.push({url,options});
+      return fetchImpl ? fetchImpl(url) : {ok:true,json:async()=>({duration:100,syncedLyrics:'[00:01]hello'})};}});
   context.importScripts= file=>vm.runInContext(source(file),context);
   vm.runInContext(source('service-worker.js'),context);
   const publish = message => runtime.onMessage.callbacks[0]({op:'publish',message},
@@ -108,7 +109,8 @@ test('LRCLIB retries once with localized/decorative suffixes removed',async()=>{
   const result=await new Promise(resolve=>h.runtime.onMessage.callbacks[0](request,sender,resolve));
   assert.deepEqual(plain(result),{cues:[]}); // duration mismatch on both attempts
   const q=h.fetches.map(f=>new URL(f.url).searchParams);
-  assert.equal(q.length,2);
+  assert.equal(q.length,3); // get, get (cleaned), search
+  assert.equal(new URL(h.fetches[2].url).pathname,'/api/search');
   assert.equal(q[1].get('track_name'),'Song');
   assert.equal(q[1].get('artist_name'),'The Band');
 });
@@ -151,4 +153,22 @@ test('translation targets are forwarded only as x-<lang> translation entries; cu
   assert.equal(h.messages.at(-1).trackId,'x-ko');
   h.publish({type:'cues',videoId:track.videoId,source:'yt-captions',lang:'ko',kind:'manual',synced:true,trackId:'bad id',cues:[{s:1,e:2,text:'x'}]});
   assert.equal(h.messages.at(-1).trackId,undefined);
+});
+test('LRCLIB search picks the synced entry with matching title and length when get finds nothing',async()=>{
+  const h=harness(async url=>{
+    if (new URL(url).pathname==='/api/get') return {ok:false,status:404,json:async()=>({})};
+    return {ok:true,json:async()=>[
+      {trackName:'Song (Live)',artistName:'Band',duration:240,syncedLyrics:'[00:01]live'},
+      {trackName:'Song',artistName:'Band',duration:181,instrumental:true,syncedLyrics:'[00:01]inst'},
+      {trackName:'Song',artistName:'Other',duration:182,syncedLyrics:'[00:01]cover'},
+      {trackName:'Song',artistName:'The Band',duration:181,syncedLyrics:'[00:02]right'},
+      {trackName:'Song',artistName:'The Band',duration:183,plainLyrics:'no sync'}]};
+  });
+  const request={op:'lyrics',query:{title:'Song (Official Video)',artist:'The Band',duration:180}};
+  const sender={id:h.runtime.id,frameId:0,url:'https://music.youtube.com/watch?v=dQw4w9WgXcQ',tab:h.tab};
+  const result=await new Promise(resolve=>h.runtime.onMessage.callbacks[0](request,sender,resolve));
+  assert.deepEqual(plain(result).cues.map(c=>c.text),['right']);
+  const search=new URL(h.fetches.at(-1).url);
+  assert.equal(search.searchParams.get('track_name'),'Song');
+  assert.equal(h.fetches.at(-1).options.credentials,'omit');
 });

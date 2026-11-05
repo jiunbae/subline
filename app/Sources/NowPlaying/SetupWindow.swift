@@ -111,7 +111,7 @@ private struct SetupView: View {
                 Text("⌃⌥⌘O show/hide  ·  ⌃⌥⌘L click-through  ·  ⌃⌥⌘Space play/pause")
                     .font(.system(size: 10.5)).foregroundStyle(.tertiary)
                 Spacer()
-                Button(extensionDone && playDone ? "Done" : "Later") { close() }
+                Button(L10n.string(extensionDone && playDone ? "Done" : "Later")) { close() }
                     .keyboardShortcut(.defaultAction)
             }
         }
@@ -172,7 +172,7 @@ private struct StepRow<Content: View>: View {
             }
             .animation(.easeOut(duration: 0.2), value: done)
             VStack(alignment: .leading, spacing: 6) {
-                Text(title).font(.system(size: 14, weight: .semibold))
+                Text(L10n.string(title)).font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(done ? .secondary : .primary)
                 if !done { content }
             }

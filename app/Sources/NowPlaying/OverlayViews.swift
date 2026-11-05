@@ -439,7 +439,7 @@ struct MiniLayout: View {
             if model.currentLine != nil {
                 CurrentLine(model: model, fontSize: max(12, min(20, size.height / 2.6)), lineLimit: 1)
             } else {
-                Text("\(model.title) · \(model.artist)")
+                Text(L10n.format("%@ · %@", model.title, model.artist))
                     .font(.system(size: max(11, min(16, size.height / 3)), weight: .semibold))
                     .foregroundStyle(.white.opacity(0.9))
                     .lineLimit(1)
@@ -595,10 +595,10 @@ struct NoTextView: View {
             Spacer()
             Image(systemName: model.textStatus == .loading ? "captions.bubble" : "text.badge.xmark")
                 .font(.system(size: 22)).foregroundStyle(.white.opacity(0.4))
-            Text(model.textStatus == .loading ? "Loading captions…"
-                 : (model.site == "ytm" ? "No lyrics for this song" : "No captions for this video"))
+            Text(L10n.string(model.textStatus == .loading ? "Loading captions…"
+                 : (model.site == "ytm" ? "No lyrics for this song" : "No captions for this video")))
                 .font(.system(size: 12, weight: .medium)).foregroundStyle(.white.opacity(0.55))
-            if model.textStatus == .available || model.textStatus == .loading { TextStatusChip(model: model) }
+            if model.textStatus == .available { TextStatusChip(model: model) } // loading is already the headline
             Spacer()
         }
         .frame(maxWidth: .infinity)
@@ -636,7 +636,7 @@ struct EmptyStateView: View {
                 .foregroundStyle(.white.opacity(0.55))
             VStack(alignment: .leading, spacing: 3) {
                 Text("Extension not connected").font(.system(size: 13, weight: .semibold)).foregroundStyle(.white.opacity(0.85))
-                LinkChip(title: "Set Up…", systemImage: "gearshape") { model.openSetup?() }
+                LinkChip(title: L10n.string("Set Up…"), systemImage: "gearshape") { model.openSetup?() }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -722,7 +722,7 @@ private struct RecentCard: View {
                     Text("RECENTLY PLAYED").font(.system(size: 9.5, weight: .bold)).kerning(0.6).foregroundStyle(.white.opacity(0.45))
                     Text(last.title).font(.system(size: max(12, min(16, size.height / 8)), weight: .semibold))
                         .foregroundStyle(.white.opacity(0.9)).lineLimit(1)
-                    Text("\(last.artist) · \(last.ago)").font(.system(size: 11)).foregroundStyle(.white.opacity(0.55)).lineLimit(1)
+                    Text(L10n.format("%@ · %@", last.artist, last.ago)).font(.system(size: 11)).foregroundStyle(.white.opacity(0.55)).lineLimit(1)
                 }
                 Spacer(minLength: 4)
                 PlayCircle(size: max(26, min(34, size.height / 4))) { model.resume(last) }
@@ -741,7 +741,7 @@ private struct RecentCard: View {
                             .contentShape(Capsule())
                         }
                         .buttonStyle(.plain)
-                        .help("\(r.title) — \(r.artist)")
+                        .help(L10n.format("%@ — %@", r.title, r.artist))
                     }
                 }
             }
@@ -792,7 +792,7 @@ private struct RecentMini: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help("Resume \(last.title)")
+        .help(L10n.format("Resume %@", last.title))
     }
 }
 
@@ -808,7 +808,7 @@ private struct RecentList: View {
                         RecentThumb(model: model, track: r, radius: 6).frame(width: 38, height: 38)
                         VStack(alignment: .leading, spacing: 1) {
                             Text(r.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
-                            Text("\(r.artist) · \(r.ago)").font(.system(size: 11)).opacity(0.55).lineLimit(1)
+                            Text(L10n.format("%@ · %@", r.artist, r.ago)).font(.system(size: 11)).opacity(0.55).lineLimit(1)
                         }
                         Spacer(minLength: 0)
                         Image(systemName: "play.fill").font(.system(size: 11)).opacity(0.6)

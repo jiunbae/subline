@@ -24,7 +24,7 @@ final class AppearanceWindowController: NSObject, NSWindowDelegate {
             let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 680, height: 600),
                              styleMask: [.titled, .closable, .fullSizeContentView],
                              backing: .buffered, defer: false)
-            w.title = "Appearance"
+            w.title = L10n.string("Appearance")
             w.titlebarAppearsTransparent = true
             w.isReleasedWhenClosed = false
             w.delegate = self
@@ -120,16 +120,16 @@ private struct AppearanceView: View {
 
     private func subtitle(_ s: OverlayStyle) -> String {
         switch s {
-        case .glass: "Transparent, text on Liquid Glass"
-        case .tinted: "Blurred panel tinted by the artwork"
-        case .clear: "No background, shadowed text"
+        case .glass: L10n.string("Transparent, text on Liquid Glass")
+        case .tinted: L10n.string("Blurred panel tinted by the artwork")
+        case .clear: L10n.string("No background, shadowed text")
         }
     }
 
     @ViewBuilder
     private func section<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.system(size: 13, weight: .semibold))
+            Text(L10n.string(title)).font(.system(size: 13, weight: .semibold))
             HStack(spacing: 12) { content() }
         }
     }
