@@ -162,7 +162,7 @@ final class PlayerModel {
     @ObservationIgnored private var secondarySent: [String: CaptionRequest] = [:]
     @ObservationIgnored private var secondaryMappedFor: [Cue] = []
     @ObservationIgnored private var timer: DispatchSourceTimer?
-    @ObservationIgnored private var panelVisible = true
+    @ObservationIgnored private var panelVisible = false // the panel starts hidden; the first show is a real change
     @ObservationIgnored private var artworkKey: String?
     @ObservationIgnored private var artworkFailedAt: [String: Double] = [:]
     @ObservationIgnored private var currentVideo: String?
@@ -307,6 +307,8 @@ final class PlayerModel {
     }
 
     func setVisible(_ visible: Bool) {
+        // Broadcast only real changes: every visibility message makes each tab answer with a clock.
+        guard visible != panelVisible else { return }
         panelVisible = visible
         send?(.visibility(visible), nil)
         reschedule()
@@ -386,7 +388,7 @@ final class PlayerModel {
         reschedule()
         scheduleAutoCaptions(s, t)
         onPresence?(true, s.isPlaying, t.videoId)
-        if Self.debugDump { dumpState() }
+        if Self.debugDump, Self.now - lastDumpAt > 0.5 { lastDumpAt = Self.now; dumpState() } // ≤2 writes/s
     }
 
     /// Applies the remembered caption language once per video when the player offers it.
@@ -549,6 +551,7 @@ final class PlayerModel {
     // MARK: Debug (defaults write com.nowplaying.app debugDump -bool true)
 
     @ObservationIgnored private static let debugDump = UserDefaults.standard.bool(forKey: "debugDump")
+    @ObservationIgnored private var lastDumpAt: Double = 0
 
     private func dumpState() {
         let s = store.active

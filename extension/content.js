@@ -209,7 +209,11 @@
   });
   chrome.runtime.onMessage.addListener((message, sender, respond) => {
     if (sender.id !== chrome.runtime.id) return;
-    if (message.type === 'visibility') { visible = message.visible !== false; updateTimer(); if (visible) clock(); }
+    if (message.type === 'visibility') {
+      // Answer only a real change (hidden → visible) with a clock; repeated messages must not echo.
+      const was = visible; visible = message.visible !== false; updateTimer();
+      if (visible && !was) clock();
+    }
     if (message.type === 'requestSnapshot') {
       refresh();
       if (track) { send({type:'track', ...track}); clock(); if (!track.isAd) { send(cues || emptyCues()); if (secondaryCues) send(secondaryCues); sendCaptionTracks(true); } }

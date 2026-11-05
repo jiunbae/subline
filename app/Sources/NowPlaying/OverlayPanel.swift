@@ -242,6 +242,7 @@ final class PanelController {
     private var hideWork: DispatchWorkItem?
     private var hideDeadline: Date?
     private var fadeGeneration = 0
+    private var fadingOut = false
 
     /// Initial visibility at launch.
     func start() {
@@ -258,7 +259,10 @@ final class PanelController {
         if hasTrack && playing {
             manualShown = false
             cancelHide()
-            if !isVisible || panel.alphaValue < CGFloat(model.opacity) { show(animated: true) }
+            // Show only when hidden or fading out. Re-showing during the fade-in restarted the animation
+            // and re-broadcast visibility on every incoming message: an app↔extension loop measured at
+            // ~1,500 messages/s and ~90% CPU for tens of seconds after playback started.
+            if !isVisible || fadingOut { show(animated: true) }
         } else if manualShown {
             return
         } else if isVisible {
@@ -299,6 +303,7 @@ final class PanelController {
     func show(animated: Bool = false) {
         cancelHide()
         fadeGeneration += 1
+        fadingOut = false
         let target = CGFloat(model.opacity)
         if !panel.isVisible {
             clampToScreen(animate: false)
@@ -324,12 +329,14 @@ final class PanelController {
         model.setVisible(false)
         UserDefaults.standard.set(false, forKey: "visible")
         guard animated, panel.isVisible else { panel.orderOut(nil); return }
+        fadingOut = true
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.35
             panel.animator().alphaValue = 0
         }, completionHandler: { [weak self] in
             MainActor.assumeIsolated {
                 guard let self, self.fadeGeneration == gen else { return } // re-shown meanwhile
+                self.fadingOut = false
                 self.panel.orderOut(nil)
                 self.panel.alphaValue = CGFloat(self.model.opacity)
             }
