@@ -14,6 +14,8 @@ final class SetupWindowController: NSObject, NSWindowDelegate {
     var isShown: Bool { window?.isVisible ?? false }
 
     func show() {
+        // Re-register every time: picks up a browser installed (or an app moved) since launch.
+        NMRegistrar.registerAll()
         if window == nil {
             let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 300),
                              styleMask: [.titled, .closable, .fullSizeContentView],
@@ -103,6 +105,8 @@ private struct SetupView: View {
                 }
             }
 
+            if !extensionDone || Diagnostics.shared.hasProblem { TroubleshootingView(diagnostics: Diagnostics.shared) }
+
             if extensionDone && playDone {
                 Label("You're all set.", systemImage: "checkmark.seal.fill")
                     .font(.system(size: 13, weight: .semibold)).foregroundStyle(.green)
@@ -177,6 +181,60 @@ private struct StepRow<Content: View>: View {
                 if !done { content }
             }
             Spacer(minLength: 0)
+        }
+    }
+}
+
+/// Shown until the extension connects: what the app checked, with Retry and Copy Diagnostics.
+private struct TroubleshootingView: View {
+    let diagnostics: Diagnostics
+    @State private var expanded = false
+    @State private var copied = false
+
+    var body: some View {
+        DisclosureGroup(isExpanded: Binding(get: { expanded || diagnostics.hasProblem }, set: { expanded = $0 })) {
+            VStack(alignment: .leading, spacing: 5) {
+                row(diagnostics.helperOK, L10n.string("Connection helper"), diagnostics.helperOK ? nil : diagnostics.helperPath)
+                if let socket = diagnostics.socketError {
+                    row(false, L10n.string("App connection"), socket)
+                }
+                if diagnostics.registrations.isEmpty {
+                    row(false, L10n.string("No supported browser found"),
+                        L10n.string("Install Google Chrome (or Chromium, Brave, Edge, Vivaldi, Arc), then press Retry."))
+                }
+                ForEach(diagnostics.registrations) { r in
+                    row(r.error == nil, L10n.format("Registered with %@", r.browser), r.error)
+                }
+                Text("If everything is checked but nothing connects: reload the extension on the browser's Extensions page and reload YouTube tabs.")
+                    .font(.system(size: 10.5)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 8) {
+                    Button("Retry") { NMRegistrar.registerAll() }
+                    Button(copied ? "Copied" : "Copy Diagnostics") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(diagnostics.report, forType: .string)
+                        copied = true
+                    }
+                }
+                .controlSize(.small)
+                .padding(.top, 2)
+            }
+            .padding(.top, 4)
+        } label: {
+            Label("Troubleshooting", systemImage: diagnostics.hasProblem ? "exclamationmark.triangle.fill" : "stethoscope")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(diagnostics.hasProblem ? Color.orange : Color.secondary)
+        }
+    }
+
+    private func row(_ ok: Bool, _ title: String, _ detail: String?) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image(systemName: ok ? "checkmark.circle.fill" : "xmark.octagon.fill")
+                .foregroundStyle(ok ? Color.green : Color.red).font(.system(size: 11))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title).font(.system(size: 11.5))
+                if let detail { Text(detail).font(.system(size: 10.5)).foregroundStyle(.secondary).textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true) }
+            }
         }
     }
 }

@@ -91,3 +91,15 @@
 "%@ · %@" = "%@ · %@";
 "%@ — %@" = "%@ — %@";
 "%@ — %@ · %@" = "%@ — %@ · %@";
+"Now Playing can't start" = "Now Playing can't start";
+"Its data folder isn't writable:\n%@\n\nCheck the folder's permissions, then open the app again." = "Its data folder isn't writable:\n%@\n\nCheck the folder's permissions, then open the app again.";
+"Connection helper" = "Connection helper";
+"App connection" = "App connection";
+"No supported browser found" = "No supported browser found";
+"Install Google Chrome (or Chromium, Brave, Edge, Vivaldi, Arc), then press Retry." = "Install Google Chrome (or Chromium, Brave, Edge, Vivaldi, Arc), then press Retry.";
+"Registered with %@" = "Registered with %@";
+"If everything is checked but nothing connects: reload the extension on the browser's Extensions page and reload YouTube tabs." = "If everything is checked but nothing connects: reload the extension on the browser's Extensions page and reload YouTube tabs.";
+"Retry" = "Retry";
+"Copied" = "Copied";
+"Copy Diagnostics" = "Copy Diagnostics";
+"Troubleshooting" = "Troubleshooting";

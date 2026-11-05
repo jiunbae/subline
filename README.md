@@ -12,7 +12,8 @@ Chrome extension (MV3) ──Native Messaging──▶ np-host ──Unix socket
 ## Install (development)
 
 ```bash
-scripts/build-app.sh --install     # builds, copies to ~/Applications/NowPlaying.app, launches it
+scripts/build-app.sh --install     # universal build (Apple Silicon + Intel), copies to ~/Applications, launches it
+ARCHS=arm64 scripts/build-app.sh   # faster single-architecture build for local work
 ```
 
 1. On launch the app registers the Native Messaging manifest for every installed Chromium browser

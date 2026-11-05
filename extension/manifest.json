@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Now Playing Overlay",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Send YouTube playback, artwork and captions to the Now Playing macOS overlay.",
   "icons": {
     "16": "icons/icon16.png",
@@ -11,6 +11,7 @@
   },
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAv1xFy13kcz+2nA3+uG5huiW/PNFDgpGXiXTuSU5qqvdgvFUHjOuUSih/abJtsEqO54Cuvhx/d5ixksj4e4qUTo6UmEJSe9NwfX+gkqDRT7hje7BY3Vf1J5C3kuwO8F0SMOffU2Kar+/yeHXqAq05XWT90jC/fjEKpHyjY0PaJaufnXvtrRxu3RUVdl0GGR8z8vCMF8/WNiFIjjsHFhk7fIQ/m2ls8+JI7t8tZS/qi7pJIoG/b6mxYWszRsRwkzGc4IebRCATy5YREbwRLjlhfmExHJJ1a62dqGhMHp/bgXrC1EVayKQzzKq8mJyFtnHrGWw4ZLMurr00D6hImre5+wIDAQAB",
   "minimum_chrome_version": "120",
+  "incognito": "not_allowed",
   "permissions": [
     "nativeMessaging",
     "alarms"

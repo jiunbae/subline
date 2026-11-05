@@ -4,6 +4,9 @@ const HOST = 'com.nowplaying.host';
 const MATCH = ['*://www.youtube.com/*', '*://music.youtube.com/*'];
 const states = new Map(), sequences = new Map(), lyricCache = new Map(), inflight = new Map();
 let port = null, retry = null, backoff = 1000, visible = true;
+// True once the native app answered on this connection: external lookups (LRCLIB) only run for a
+// user who actually has the companion app, as the store listing promises.
+let nativeReady = false;
 // A wall-clock epoch prevents sequence regression after an MV3 worker restart;
 // increment separately per tab, and never reset at native reconnect/video change.
 const epoch = Date.now() * 1000;
@@ -22,6 +25,7 @@ function nativeSend(tabId, message) {
   catch { disconnect(); }
 }
 function disconnect() {
+  nativeReady = false;
   const old = port; port = null;
   try { old?.disconnect(); } catch {}
   if (!retry) {
@@ -59,6 +63,7 @@ function connect() {
       if (port !== connection || message?.v !== 1) return;
       // Receiving anything demonstrates a usable round trip.
       backoff = 1000;
+      nativeReady = true;
       if (message.type === 'requestSnapshot') void snapshot();
       else if (message.type === 'visibility' && typeof message.visible === 'boolean') {
         visible = message.visible;
@@ -181,8 +186,10 @@ async function lyrics(query) {
 }
 chrome.runtime.onMessage.addListener((request, sender, respond) => {
   if (sender.id !== chrome.runtime.id || sender.frameId !== 0 || !sender.tab || !allowed(sender.url)) return;
+  if (sender.tab.incognito) return; // defense in depth: the manifest already disallows incognito
   if (request?.op === 'lyrics') {
     if (new URL(sender.url).hostname !== 'music.youtube.com') return;
+    if (!nativeReady) { respond({cues:[], offline:true}); return; } // retried once the app connects
     lyrics(request.query).then(respond, () => respond({cues:[]})); return true;
   }
   if (request?.op !== 'publish') return;

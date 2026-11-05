@@ -33,13 +33,27 @@ public enum NPPaths {
 
     public static var lockPath: String { supportDir.appendingPathComponent("app.lock").path }
 
-    /// Takes an exclusive, non-blocking lock held for the life of the process.
-    /// Returns false if another instance holds it. Closes the stale-socket TOCTOU window.
-    public static func acquireInstanceLock() -> Bool {
-        let fd = open(lockPath, O_RDWR | O_CREAT | O_CLOEXEC, 0o600)
-        guard fd >= 0 else { return false }
-        if flock(fd, LOCK_EX | LOCK_NB) != 0 { close(fd); return false }
-        return true // fd intentionally leaked: the lock lives until exit
+    public enum LockResult: Equatable {
+        case acquired
+        case heldByAnotherInstance
+        /// The lock file could not be opened/locked for another reason (permissions, read-only disk…).
+        case failed(String)
+    }
+
+    /// Takes an exclusive, non-blocking lock held for the life of the process. Closes the
+    /// stale-socket TOCTOU window. Distinguishes contention from a filesystem problem.
+    public static func acquireInstanceLock(at path: String = lockPath) -> LockResult {
+        let fd = open(path, O_RDWR | O_CREAT | O_CLOEXEC, 0o600)
+        guard fd >= 0 else {
+            let e = errno // read before anything else can overwrite it
+            return .failed("\(path): \(String(cString: strerror(e)))")
+        }
+        if flock(fd, LOCK_EX | LOCK_NB) != 0 {
+            let e = errno
+            close(fd)
+            return e == EWOULDBLOCK ? .heldByAnotherInstance : .failed("\(path): \(String(cString: strerror(e)))")
+        }
+        return .acquired // fd intentionally leaked: the lock lives until exit
     }
 
     public static func ensureSupportDir() throws {

@@ -292,3 +292,22 @@ import Foundation
         #expect(l.translations?.first?.isTranslation == true)
     }
 }
+
+@Suite struct LockTests {
+    @Test func lockReportsContentionAndFilesystemFailureDifferently() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("np-lock-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let path = dir.appendingPathComponent("app.lock").path
+        // Held by another descriptor → contention.
+        let other = open(path, O_RDWR | O_CREAT, 0o600); defer { close(other) }
+        #expect(flock(other, LOCK_EX | LOCK_NB) == 0)
+        #expect(NPPaths.acquireInstanceLock(at: path) == .heldByAnotherInstance)
+        // Unreadable lock file → a real failure with the OS reason.
+        let blocked = dir.appendingPathComponent("blocked.lock").path
+        FileManager.default.createFile(atPath: blocked, contents: nil, attributes: [.posixPermissions: 0])
+        if case let .failed(reason) = NPPaths.acquireInstanceLock(at: blocked) {
+            #expect(reason.contains("Permission denied"))
+        } else { Issue.record("expected failure") }
+    }
+}

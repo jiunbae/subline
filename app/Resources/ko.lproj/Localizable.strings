@@ -91,3 +91,15 @@
 "%@ · %@" = "%@ · %@";
 "%@ — %@" = "%@ — %@";
 "%@ — %@ · %@" = "%@ — %@ · %@";
+"Now Playing can't start" = "Now Playing을 시작할 수 없습니다";
+"Its data folder isn't writable:\n%@\n\nCheck the folder's permissions, then open the app again." = "데이터 폴더에 쓸 수 없습니다:\n%@\n\n폴더 권한을 확인한 뒤 앱을 다시 여세요.";
+"Connection helper" = "연결 도우미";
+"App connection" = "앱 연결";
+"No supported browser found" = "지원되는 브라우저가 없습니다";
+"Install Google Chrome (or Chromium, Brave, Edge, Vivaldi, Arc), then press Retry." = "Google Chrome(또는 Chromium, Brave, Edge, Vivaldi, Arc)을 설치한 뒤 다시 시도를 누르세요.";
+"Registered with %@" = "%@에 등록됨";
+"If everything is checked but nothing connects: reload the extension on the browser's Extensions page and reload YouTube tabs." = "모두 정상인데 연결되지 않으면 브라우저의 확장 프로그램 페이지에서 확장을 새로고침하고 YouTube 탭도 새로고침하세요.";
+"Retry" = "다시 시도";
+"Copied" = "복사됨";
+"Copy Diagnostics" = "진단 정보 복사";
+"Troubleshooting" = "문제 해결";

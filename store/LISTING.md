@@ -31,7 +31,8 @@ Now Playing app for macOS, which shows it in a small floating window above your 
 • Play/pause, next and previous from the overlay or global shortcuts
 • Lightweight: the extension only relays events; the overlay uses about 1% CPU while playing
 
-Requires the Now Playing app for macOS (macOS 14 or later). Without it the extension does nothing.
+Requires the Now Playing app for macOS (macOS 14 or later; universal app for Apple Silicon and Intel).
+Without it the extension does nothing and sends nothing. It does not run in incognito windows.
 
 Privacy: no accounts, analytics or tracking. Playback information goes only to the Now Playing
 app on your Mac. To find synced lyrics, the song title, artist, album and length are sent to
@@ -51,7 +52,8 @@ Now Playing Overlay는 YouTube나 YouTube Music 탭에서 재생 중인 곡 정�
 • 오버레이나 전역 단축키로 재생/일시정지, 이전/다음 곡
 • 가볍습니다. 확장은 이벤트를 전달만 하고, 오버레이는 재생 중 CPU를 1% 정도 씁니다
 
-macOS용 Now Playing 앱(macOS 14 이상)이 있어야 동작합니다.
+macOS용 Now Playing 앱(macOS 14 이상, Apple Silicon·Intel 공용)이 있어야 동작합니다. 앱이 없으면 아무것도 하지 않고
+아무 데이터도 보내지 않습니다. 시크릿 창에서는 동작하지 않습니다.
 
 개인정보: 계정, 분석, 추적이 없습니다. 재생 정보는 내 Mac의 Now Playing 앱으로만 갑니다.
 시간 맞춤 가사를 찾을 때만 곡 제목, 아티스트, 앨범, 길이를 공개 가사 데이터베이스 lrclib.net에 보냅니다.
@@ -70,7 +72,7 @@ macOS용 Now Playing 앱(macOS 14 이상)이 있어야 동작합니다.
 | `nativeMessaging` | Sends playback state, artwork URLs and captions/lyrics to the user's locally installed Now Playing macOS app, and receives playback commands from it. This is the extension's only output. |
 | `alarms` | Schedules a reconnect to the local Now Playing app after it restarts or is launched later, without keeping the service worker alive. |
 | Host `www.youtube.com`, `music.youtube.com` | Reads the current video/track (title, artist, artwork, position) and the captions the YouTube player itself downloads, and performs play/pause/seek/next/previous on the user's request. |
-| Host `lrclib.net` | Looks up time-synced lyrics for the current song (title, artist, album, length) when YouTube Music doesn't provide synced lyrics. |
+| Host `lrclib.net` | Looks up time-synced lyrics for the current song (title, artist, album, length) when YouTube Music doesn't provide synced lyrics — only while the companion app is connected. |
 
 **Remote code:** No, I am not using remote code. All JavaScript is in the package.
 

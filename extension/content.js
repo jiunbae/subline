@@ -102,6 +102,8 @@
     try {
       const result = await chrome.runtime.sendMessage({op:'lyrics', query});
       if (epoch !== generation || track?.videoId !== id || track.isAd || cues?.cues?.length) return;
+      // No companion app yet: don't query anyone; try again when the app asks for a snapshot.
+      if (result?.offline) { lyricsAttempt = ''; return; }
       if (result?.cues?.length) emitCues({type:'cues', videoId:id, source:'lrclib', kind:'lyrics', synced:true, cues:result.cues});
       else askMain('lyrics', {videoId:id}); // YTM's own (usually unsynced) lyrics as the last resort
     } catch { if (epoch === generation && track?.videoId === id && !cues?.cues?.length) askMain('lyrics', {videoId:id}); }

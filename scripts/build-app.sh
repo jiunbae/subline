@@ -5,8 +5,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 APP="$ROOT/build/NowPlaying.app"
 cd "$ROOT/app"
-swift build -c release --arch arm64
-BIN="$(swift build -c release --arch arm64 --show-bin-path)"
+# Universal (Apple Silicon + Intel) by default; ARCHS="arm64" for a faster local build.
+ARCH_FLAGS=(); for a in ${ARCHS:-arm64 x86_64}; do ARCH_FLAGS+=(--arch "$a"); done
+swift build -c release "${ARCH_FLAGS[@]}"
+BIN="$(swift build -c release "${ARCH_FLAGS[@]}" --show-bin-path)"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Helpers" "$APP/Contents/Resources"

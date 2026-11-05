@@ -20,17 +20,21 @@ enum NMRegistrar {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support")
     }
 
+    /// Registers with every installed browser and records the outcome in `Diagnostics`.
+    /// Safe to call repeatedly (writes only when the manifest changed); the setup window calls it
+    /// again, so a browser installed after launch is picked up.
+    @MainActor
     static func registerAll() {
-        registerHost()
+        let exe = hostExecutable
+        let helperOK = FileManager.default.isExecutableFile(atPath: exe.path)
+        let results = helperOK ? registerHost() : []
+        if !helperOK { NSLog("NowPlaying: np-host missing at %@ (running outside the .app bundle?)", exe.path) }
+        Diagnostics.shared.update(helperPath: exe.path, helperOK: helperOK, registrations: results)
         if let id = NPPaths.storeExtensionID { requestExternalInstall(id) }
     }
 
-    static func registerHost() {
+    static func registerHost() -> [Diagnostics.Registration] {
         let exe = hostExecutable
-        guard FileManager.default.isExecutableFile(atPath: exe.path) else {
-            NSLog("NowPlaying: np-host missing at %@ (running outside the .app bundle?)", exe.path)
-            return
-        }
         let manifest: [String: Any] = [
             "name": NPPaths.hostName,
             "description": "Now Playing overlay bridge",
@@ -38,15 +42,25 @@ enum NMRegistrar {
             "type": "stdio",
             "allowed_origins": NPPaths.allowedExtensionIDs.map { "chrome-extension://\($0)/" },
         ]
-        guard let data = try? JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys]) else { return }
+        guard let data = try? JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys]) else { return [] }
+        var results: [Diagnostics.Registration] = []
         for dir in browserDirs {
             let browser = appSupport.appendingPathComponent(dir)
             guard FileManager.default.fileExists(atPath: browser.path) else { continue }
             let hosts = browser.appendingPathComponent("NativeMessagingHosts")
-            try? FileManager.default.createDirectory(at: hosts, withIntermediateDirectories: true)
             let file = hosts.appendingPathComponent("\(NPPaths.hostName).json")
-            if (try? Data(contentsOf: file)) != data { try? data.write(to: file, options: .atomic) }
+            let name = (dir.replacingOccurrences(of: "/User Data", with: "").components(separatedBy: "/").last ?? dir)
+                .replacingOccurrences(of: "-Browser", with: "")
+            do {
+                try FileManager.default.createDirectory(at: hosts, withIntermediateDirectories: true)
+                if (try? Data(contentsOf: file)) != data { try data.write(to: file, options: .atomic) }
+                results.append(.init(browser: name, path: file.path, error: nil))
+            } catch {
+                NSLog("NowPlaying: registering with %@ failed: %@", name, error.localizedDescription)
+                results.append(.init(browser: name, path: file.path, error: error.localizedDescription))
+            }
         }
+        return results
     }
 
     /// Written once per browser. If the user later removes the extension, Chrome remembers that and

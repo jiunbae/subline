@@ -31,6 +31,8 @@ function harness(fetchImpl) {
     {id:runtime.id,frameId:0,url:tab.url,tab},()=>{});
   return {runtime,tabs,alarms,tab,messages,sent,ports,timers,publish,fetches,fetchCount:()=>fetchCount};
 }
+// The companion app answered once: external lyric lookups are allowed from then on.
+const ready=h=>h.ports[0].onMessage.callbacks[0]({v:1,type:'visibility',visible:true});
 const track={type:'track',site:'yt',videoId:'dQw4w9WgXcQ',title:'Example',artist:'Artist',duration:100,artwork:[],isAd:false};
 test('manifest public key derives the pinned ID and both worlds attach at document_start',()=>{
   const manifest=JSON.parse(source('manifest.json'));
@@ -90,7 +92,7 @@ test('native visibility and validated commands route to content script',async()=
   assert.equal(h.sent.find(m=>m.type==='cmd').t,30);
 });
 test('LRCLIB fetch occurs in worker with omitted credentials and caches normalized cues',async()=>{
-  const h=harness();
+  const h=harness(); ready(h);
   const request={op:'lyrics',query:{title:'Example',artist:'Artist',album:'Album',duration:100}};
   const sender={id:h.runtime.id,frameId:0,url:'https://music.youtube.com/watch?v=dQw4w9WgXcQ',tab:h.tab};
   const run=()=>new Promise(resolve=>h.runtime.onMessage.callbacks[0](request,sender,resolve));
@@ -103,7 +105,7 @@ test('LRCLIB fetch occurs in worker with omitted credentials and caches normaliz
   assert.deepEqual(plain(result),{cues:[]});
 });
 test('LRCLIB retries once with localized/decorative suffixes removed',async()=>{
-  const h=harness();
+  const h=harness(); ready(h);
   const request={op:'lyrics',query:{title:'Song (Official Audio)',artist:'The Band(더 밴드) - Topic',duration:110}};
   const sender={id:h.runtime.id,frameId:0,url:'https://music.youtube.com/watch?v=dQw4w9WgXcQ',tab:h.tab};
   const result=await new Promise(resolve=>h.runtime.onMessage.callbacks[0](request,sender,resolve));
@@ -163,7 +165,7 @@ test('LRCLIB search picks the synced entry with matching title and length when g
       {trackName:'Song',artistName:'Other',duration:182,syncedLyrics:'[00:01]cover'},
       {trackName:'Song',artistName:'The Band',duration:181,syncedLyrics:'[00:02]right'},
       {trackName:'Song',artistName:'The Band',duration:183,plainLyrics:'no sync'}]};
-  });
+  }); ready(h);
   const request={op:'lyrics',query:{title:'Song (Official Video)',artist:'The Band',duration:180}};
   const sender={id:h.runtime.id,frameId:0,url:'https://music.youtube.com/watch?v=dQw4w9WgXcQ',tab:h.tab};
   const result=await new Promise(resolve=>h.runtime.onMessage.callbacks[0](request,sender,resolve));
@@ -174,7 +176,7 @@ test('LRCLIB search picks the synced entry with matching title and length when g
 });
 test('LRCLIB search requires artist identity and skips empty candidates',async()=>{
   const run=async list=>{
-    const h=harness(async url=>new URL(url).pathname==='/api/get' ? {ok:false,status:404,json:async()=>({})} : {ok:true,json:async()=>list});
+    const h=harness(async url=>new URL(url).pathname==='/api/get' ? {ok:false,status:404,json:async()=>({})} : {ok:true,json:async()=>list}); ready(h);
     const request={op:'lyrics',query:{title:'Song',artist:'The Band',duration:180}};
     const sender={id:h.runtime.id,frameId:0,url:'https://music.youtube.com/watch?v=dQw4w9WgXcQ',tab:h.tab};
     return plain(await new Promise(resolve=>h.runtime.onMessage.callbacks[0](request,sender,resolve))).cues.map(c=>c.text);
@@ -187,4 +189,15 @@ test('LRCLIB search requires artist identity and skips empty candidates',async()
     {trackName:'Song',artistName:'The Band',duration:180,syncedLyrics:'no timestamps'},
     {trackName:'Song',artistName:'The Band',duration:181,syncedLyrics:'[00:03]valid'}]),['valid']);
   assert.deepEqual(await run([{trackName:'Completely Different',artistName:'The Band',duration:180,syncedLyrics:'[00:01]x'}]),[]);
+});
+test('no external lyric lookup before the companion app has answered, and incognito tabs are ignored',async()=>{
+  const h=harness();
+  const sender={id:h.runtime.id,frameId:0,url:'https://music.youtube.com/watch?v=dQw4w9WgXcQ',tab:h.tab};
+  const result=await new Promise(resolve=>h.runtime.onMessage.callbacks[0]({op:'lyrics',query:{title:'A',artist:'B',duration:100}},sender,resolve));
+  assert.deepEqual(plain(result),{cues:[],offline:true});
+  assert.equal(h.fetchCount(),0);
+  const count=h.messages.length;
+  h.runtime.onMessage.callbacks[0]({op:'publish',message:track},{...sender,url:'https://www.youtube.com/watch?v=dQw4w9WgXcQ',tab:{...h.tab,incognito:true}},()=>{});
+  assert.equal(h.messages.length,count);
+  assert.equal(JSON.parse(source('manifest.json')).incognito,'not_allowed');
 });

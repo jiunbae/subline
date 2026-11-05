@@ -20,11 +20,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             StoreShots.show(args[i + 1])
             return
         }
-        try? NPPaths.ensureSupportDir()
+        var setupError: String?
+        do { try NPPaths.ensureSupportDir() } catch { setupError = "\(NPPaths.supportDir.path): \(error.localizedDescription)" }
         // Single instance: the flock is authoritative; only its holder may unlink/bind the socket.
-        if !NPPaths.acquireInstanceLock() {
+        switch NPPaths.acquireInstanceLock() {
+        case .acquired: break
+        case .heldByAnotherInstance:
             NSLog("NowPlaying: another instance is running")
             exit(0)
+        case let .failed(reason):
+            // Not "already running": the support folder isn't usable. Say so instead of vanishing.
+            let alert = NSAlert()
+            alert.messageText = L10n.string("Now Playing can't start")
+            alert.informativeText = L10n.format("Its data folder isn't writable:\n%@\n\nCheck the folder's permissions, then open the app again.", setupError ?? reason)
+            alert.alertStyle = .critical
+            NSApp.activate(ignoringOtherApps: true)
+            alert.runModal()
+            exit(1)
         }
         try? FileManager.default.removeItem(at: NPPaths.disabledMarker)
         BackgroundCursor.enable()
@@ -44,7 +56,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         server.onDisconnect = { [weak self] id in self?.model.disconnected(id) }
         server.onMessage = { [weak self] id, msg in self?.model.handle(conn: id, msg) }
         model.send = { [weak self] msg, conn in self?.server.send(msg, to: conn) }
-        do { try server.start() } catch { NSLog("NowPlaying: socket failed: %@", "\(error)") }
+        do { try server.start() } catch {
+            NSLog("NowPlaying: socket failed: %@", "\(error)")
+            Diagnostics.shared.socketError = "\(error)"
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.setup.show() } // surface it
+        }
 
         panel = PanelController(model: model)
         menu = StatusMenuController(model: model, panel: panel)
