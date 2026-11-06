@@ -19,6 +19,8 @@ actor LyricsService {
         var at: Date
         /// Set when the user picked "No Lyrics" for this song.
         var hidden: Bool?
+        /// The user's own .lrc for this song, kept even when another version is shown.
+        var imported: String?
     }
 
     private let session: URLSession = {
@@ -40,12 +42,12 @@ actor LyricsService {
 
     func lookup(_ q: LyricsQuery) async -> Outcome {
         if let e = entry(q.cacheKey) {
-            if e.hidden == true { return .notFound(candidates: e.candidates) }
+            if e.hidden == true { return .notFound(candidates: withImported(e, q)) }
             if let lrc = e.lrc, let id = e.chosen {
                 let cues = Lyrics.parseLRC(lrc, duration: q.duration)
-                if !cues.isEmpty { return .found(cues: cues, chosen: id, candidates: e.candidates) }
+                if !cues.isEmpty { return .found(cues: cues, chosen: id, candidates: withImported(e, q)) }
             } else if Date().timeIntervalSince(e.at) < Self.negativeTTL {
-                return .notFound(candidates: e.candidates)
+                return .notFound(candidates: withImported(e, q))
             }
         }
         var transient = false
@@ -68,13 +70,17 @@ actor LyricsService {
         if let pick = Lyrics.autoPick(exact: exact, ranked: ranked, for: q), let lrc = pick.syncedLyrics {
             let cues = Lyrics.parseLRC(lrc, duration: q.duration)
             if !cues.isEmpty {
-                save(q.cacheKey, Entry(chosen: pick.id, lrc: lrc, candidates: candidates, at: Date()))
-                return .found(cues: cues, chosen: pick.id, candidates: candidates)
+                var fresh = Entry(chosen: pick.id, lrc: lrc, candidates: candidates, at: Date())
+                fresh.imported = entry(q.cacheKey)?.imported
+                save(q.cacheKey, fresh)
+                return .found(cues: cues, chosen: pick.id, candidates: withImported(fresh, q))
             }
         }
         if transient && candidates.isEmpty { return .transient }
-        save(q.cacheKey, Entry(chosen: nil, lrc: nil, candidates: candidates, at: Date()))
-        return .notFound(candidates: candidates)
+        var none = Entry(chosen: nil, lrc: nil, candidates: candidates, at: Date())
+        none.imported = entry(q.cacheKey)?.imported
+        save(q.cacheKey, none)
+        return .notFound(candidates: withImported(none, q))
     }
 
     /// Switches this song to another LRCLIB version (remembered). nil = show no lyrics for it.
@@ -83,7 +89,11 @@ actor LyricsService {
         guard let id else {
             e.hidden = true; e.at = Date(); save(q.cacheKey, e); return nil
         }
-        // The version on disk (e.g. after "No Lyrics"): no network needed.
+        // The version on disk (e.g. after "No Lyrics"), or the user's imported file: no network needed.
+        if id == Self.importedID, let lrc = e.imported {
+            let cues = Lyrics.parseLRC(lrc, duration: q.duration)
+            if !cues.isEmpty { e.chosen = id; e.lrc = lrc; e.hidden = nil; e.at = Date(); save(q.cacheKey, e); return cues }
+        }
         if e.chosen == id, let lrc = e.lrc {
             let cues = Lyrics.parseLRC(lrc, duration: q.duration)
             if !cues.isEmpty { e.hidden = nil; e.at = Date(); save(q.cacheKey, e); return cues }
@@ -105,9 +115,18 @@ actor LyricsService {
         let cues = Lyrics.parseLRC(text, duration: q.duration)
         guard !cues.isEmpty else { return nil }
         var e = entry(q.cacheKey) ?? Entry(chosen: nil, lrc: nil, candidates: [], at: Date())
-        e.chosen = Self.importedID; e.lrc = text; e.hidden = nil; e.at = Date()
+        e.chosen = Self.importedID; e.lrc = text; e.imported = text; e.hidden = nil; e.at = Date()
         save(q.cacheKey, e)
         return cues
+    }
+
+    /// Menu entry for an imported file (listed with the LRCLIB versions).
+    static func importedCandidate(_ q: LyricsQuery) -> LyricsCandidate {
+        LyricsCandidate(id: importedID, trackName: L10n.string("Imported LRC File"), artistName: "", albumName: nil, duration: q.duration)
+    }
+
+    private func withImported(_ e: Entry, _ q: LyricsQuery) -> [LyricsCandidate] {
+        e.imported == nil ? e.candidates : [Self.importedCandidate(q)] + e.candidates.filter { $0.id != Self.importedID }
     }
 
     /// Forgets the cached result (and choice) so the next lookup asks LRCLIB again.
@@ -139,7 +158,8 @@ actor LyricsService {
             var data = Data()
             for try await chunk in bytes {
                 data.append(chunk)
-                if data.count > Self.maxSearchBytes { bytes.task.cancel(); return .success([]) }
+                // Too big to be a sane result: not cached as "no lyrics" (treated like a server hiccup).
+                if data.count > Self.maxSearchBytes { bytes.task.cancel(); return .failure(.transient) }
             }
             return .success(Array(((try? JSONDecoder().decode([LRCLIBRecord].self, from: data)) ?? []).prefix(30)))
         } catch { return .failure(.transient) }

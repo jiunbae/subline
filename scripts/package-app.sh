@@ -27,18 +27,27 @@ if [[ "${RELEASE:-0}" == 1 && $RELEASE_READY -eq 0 ]]; then
 fi
 "$ROOT/scripts/build-app.sh"
 VERSION="$(tr -d '[:space:]' < "$ROOT/VERSION")"
-# Only a notarized build gets the plain distribution name; anything else is marked local.
-if [[ $RELEASE_READY -eq 1 ]]; then OUT="$ROOT/build/Subline-$VERSION.zip"; else OUT="$ROOT/build/Subline-$VERSION-local.zip"; fi
-zip_app() { rm -f "$OUT"; ditto -c -k --sequesterRsrc --keepParent "$APP" "$OUT"; }
-zip_app
+zip_app() { rm -f "$1"; ditto -c -k --sequesterRsrc --keepParent "$APP" "$1"; }
 
 if [[ $RELEASE_READY -eq 1 ]]; then
-  echo "notarizing $OUT (usually a few minutes)…"
-  xcrun notarytool submit "$OUT" "${NOTARY_ARGS[@]}" --wait --timeout 30m | tee "$ROOT/build/notary.log"
+  # The distribution-named zip appears only after notarization, stapling and the Gatekeeper check
+  # succeed; the upload goes through a temporary archive that is always removed.
+  OUT="$ROOT/build/Subline-$VERSION.zip"
+  rm -f "$OUT"
+  SUBMIT="$(mktemp -d)/Subline-submit.zip"; trap 'rm -rf "$(dirname "$SUBMIT")"' EXIT
+  zip_app "$SUBMIT"
+  echo "notarizing (usually a few minutes)…"
+  xcrun notarytool submit "$SUBMIT" "${NOTARY_ARGS[@]}" --wait --timeout 30m | tee "$ROOT/build/notary.log"
   grep -q 'status: Accepted' "$ROOT/build/notary.log" || { echo "notarization was not accepted; see build/notary.log and 'xcrun notarytool log <id>'" >&2; exit 1; }
   xcrun stapler staple "$APP"
   spctl -a -t exec -vv "$APP"
-  zip_app
+  zip_app "$OUT"
+else
+  # Not for distribution: marked local.
+  OUT="$ROOT/build/Subline-$VERSION-local.zip"
+  zip_app "$OUT"
+fi
+if [[ $RELEASE_READY -eq 1 ]]; then :
 elif [[ $SIGNED -eq 1 ]]; then
   echo "signed but NOT notarized (local use only): set NOTARY_PROFILE or NOTARY_KEY/NOTARY_KEY_ID/NOTARY_ISSUER" >&2
 else

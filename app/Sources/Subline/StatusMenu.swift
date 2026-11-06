@@ -364,11 +364,6 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
             i.state = model.lyricsChosenID == c.id && model.cueSource == "lrclib" ? .on : .off
             m.addItem(i)
         }
-        if model.lyricsChosenID == LyricsService.importedID {
-            let imp = NSMenuItem(title: L10n.string("Imported LRC File"), action: nil, keyEquivalent: "")
-            imp.state = .on; imp.isEnabled = false
-            m.addItem(imp)
-        }
         m.addItem(.separator())
         let importItem = NSMenuItem(title: L10n.string("Import LRC File…"), action: #selector(importLRC), keyEquivalent: "")
         importItem.target = self
@@ -389,11 +384,13 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
 
     @objc private func pickLyrics(_ s: NSMenuItem) {
         guard let id = s.representedObject as? Int else { return }
-        model.chooseLyrics(id < 0 ? nil : id)
+        model.chooseLyrics(id == -1 ? nil : id) // -1 = hide; -2 = the imported file
     }
     @objc private func searchLyricsAgain() { model.searchLyricsAgain() }
 
     @objc private func importLRC() {
+        // Capture the song now: it may change while the panel is open.
+        guard let target = model.importTarget() else { return }
         let panel = NSOpenPanel()
         panel.title = L10n.string("Import LRC File…")
         panel.message = L10n.format("Synced lyrics for “%@”", model.title)
@@ -405,7 +402,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
               let data = try? Data(contentsOf: url),
               let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) else { return }
         Task { @MainActor in
-            if await !model.importLyrics(text) {
+            if await !model.importLyrics(text, for: target) {
                 let a = NSAlert()
                 a.messageText = L10n.string("No timed lines in this file")
                 a.informativeText = L10n.string("An LRC file has lines like “[01:23.45] lyrics”.")

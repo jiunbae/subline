@@ -9,7 +9,7 @@ show what you are playing on YouTube, YouTube Music, Spotify or Apple Music in a
 
 | Data | Where it goes | Why |
 |---|---|---|
-| Title, artist, album, duration, thumbnail URL, play/pause state and position of the video or track in your YouTube / YouTube Music tab | The Subline app on **your own Mac**, through Chrome Native Messaging. It is never sent to the developer; only the lyrics lookup below leaves your Mac. | To display it in the overlay |
+| Title, artist, album, duration, thumbnail URL, play/pause state and position of the video or track in your YouTube / YouTube Music tab | The Subline app on **your own Mac**, through Chrome Native Messaging. It is never sent to the developer. Song metadata is also sent for the lyrics lookup below, and artwork images are downloaded from the image servers listed below. | To display it in the overlay |
 | Captions the YouTube player downloads for the current video | The Subline app on your Mac | To show time-synced text |
 | Title, artist, album and duration of the current song (YouTube Music, Spotify, Apple Music) | **lrclib.net**, a public lyrics database ([lrclib.net](https://lrclib.net)), requested by the **macOS app** without cookies. The extension itself contacts no one. | To find time-synced lyrics |
 | What Spotify or Apple Music is playing (title, artist, album, duration, position, artwork) | Read on your Mac by the app, through the apps' own playback notifications and macOS Automation (which macOS asks you to allow). Turn it off in the menu: Follow Spotify and Apple Music | To display it and its lyrics |

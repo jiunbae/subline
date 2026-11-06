@@ -513,7 +513,11 @@ final class PlayerModel {
         let gen = derivedGen
         derivedTask?.cancel()
         // Don't leave lines made from the previous text up while the new ones are built.
-        if DerivedLines.isDerived(s.secondaryCueSet?.trackID) { clearSecondary(s.key, t.videoId) }
+        if DerivedLines.isDerived(s.secondaryCueSet?.trackID) {
+            clearSecondary(s.key, t.videoId)
+            assign(\.secondaryCues, []); assign(\.secondaryByRow, []); assign(\.secondaryActiveIndex, nil)
+            secondaryMappedFor = []
+        }
         let key = s.key, vid = t.videoId, source = cues, lang = DerivedLines.language(of: cues, hint: main.lang)
         derivedTask = Task { [weak self] in
             var out: [Cue] = []
@@ -768,13 +772,24 @@ final class PlayerModel {
     }
 
     /// Shows an .lrc file for this song (remembered). Returns false when the file has no timed lines.
-    func importLyrics(_ text: String) async -> Bool {
-        guard let s = store.active, let t = s.track, let q = lyricsQuery(t) else { return false }
-        let key = s.key, vid = t.videoId
+    /// The song an import is for, captured before the file panel opens (the song may change meanwhile).
+    struct ImportTarget { let key: TabKey; let vid: String; let query: LyricsQuery }
+    func importTarget() -> ImportTarget? {
+        guard let s = store.active, let t = s.track, let q = lyricsQuery(t) else { return nil }
+        return ImportTarget(key: s.key, vid: t.videoId, query: q)
+    }
+
+    func importLyrics(_ text: String, for target: ImportTarget) async -> Bool {
+        guard let cues = await lyricsService.importLRC(text, for: target.query) else { return false }
+        // Saved for that song either way; shown only if it is still the one playing.
+        guard store.active?.key == target.key, store.active?.track?.videoId == target.vid else { return true }
         lyricsTask?.cancel()
-        guard let cues = await lyricsService.importLRC(text, for: q), store.active?.track?.videoId == vid else { return false }
+        assign(\.lyricsSearching, false)
         assign(\.lyricsChosenID, LyricsService.importedID)
-        applyLyrics(cues, key: key, vid: vid)
+        if !lyricsCandidates.contains(where: { $0.id == LyricsService.importedID }) {
+            assign(\.lyricsCandidates, [LyricsService.importedCandidate(target.query)] + lyricsCandidates)
+        }
+        applyLyrics(cues, key: target.key, vid: target.vid)
         return true
     }
 
