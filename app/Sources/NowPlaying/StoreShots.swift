@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// Renders Chrome Web Store marketing images with the real overlay views (incl. Liquid Glass).
-/// `NowPlaying --store-shot <1|2|3|promo>` opens one borderless window of the exact asset size at the
+/// `NowPlaying --store-shot <1|2|3|promo|banner|social>` opens one borderless window of the exact asset size at the
 /// main screen's bottom-left; `scripts/store-assets.sh` captures it. Sample content only: no album art,
 /// wallpaper or song that isn't ours.
 @MainActor
@@ -17,6 +17,8 @@ enum StoreShots {
             case "2": return (CGSize(width: 1280, height: 800), AnyView(ShotLyrics(model: model)))
             case "3": return (CGSize(width: 1280, height: 800), AnyView(ShotStyles(model: model)))
             case "promo": return (CGSize(width: 440, height: 280), AnyView(PromoTile()))
+            case "banner": return (CGSize(width: 1600, height: 560), AnyView(Banner(model: model)))
+            case "social": return (CGSize(width: 1280, height: 640), AnyView(SocialCard(model: model)))
             case "idle": return (CGSize(width: 1280, height: 800), AnyView(ShotIdle()))
             default: return (CGSize(width: 1280, height: 800), AnyView(ShotHero(model: model)))
             }
@@ -171,6 +173,62 @@ private struct PromoTile: View {
                     Text("Floating lyrics\nfor YouTube on Mac").font(.system(size: 17, weight: .medium))
                         .foregroundStyle(.white.opacity(0.75))
                 }
+            }
+        }
+    }
+}
+
+/// Wordmark lockup: app icon, name and tagline.
+private struct Lockup: View {
+    var iconSize: CGFloat = 112
+    var tagline = "Floating lyrics & captions for YouTube on your Mac"
+    var body: some View {
+        HStack(spacing: iconSize * 0.22) {
+            Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: iconSize, height: iconSize)
+                .shadow(color: .black.opacity(0.35), radius: 18, y: 8)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Now Playing").font(.system(size: iconSize * 0.56, weight: .heavy, design: .rounded))
+                    .foregroundStyle(LinearGradient(colors: [.white, Color(red: 1.0, green: 0.83, blue: 0.78)],
+                                                    startPoint: .leading, endPoint: .trailing))
+                Text(tagline).font(.system(size: iconSize * 0.2, weight: .medium)).foregroundStyle(.white.opacity(0.75))
+            }
+        }
+    }
+}
+
+/// README header (docs/assets/banner.png).
+private struct Banner: View {
+    let model: PlayerModel
+    var body: some View {
+        ZStack(alignment: .leading) {
+            ShotBackdrop()
+            Lockup().padding(.leading, 90).offset(y: -40)
+            HStack(spacing: 10) {
+                ForEach(["YouTube", "YouTube Music", "macOS 14+", "Apple Silicon · Intel"], id: \.self) { t in
+                    Text(t).font(.system(size: 17, weight: .semibold)).foregroundStyle(.white.opacity(0.85))
+                        .padding(.horizontal, 14).padding(.vertical, 7)
+                        .background(.white.opacity(0.12), in: Capsule())
+                        .overlay(Capsule().strokeBorder(.white.opacity(0.18)))
+                }
+            }
+            .padding(.leading, 90).offset(y: 95)
+            Overlay(model: model, style: .glass, layout: .coverLine, size: CGSize(width: 540, height: 170))
+                .position(x: 1230, y: 235)
+            Overlay(model: model, style: .tinted, layout: .mini, size: CGSize(width: 400, height: 62))
+                .position(x: 1300, y: 395)
+        }
+    }
+}
+
+/// GitHub social preview (docs/assets/social.png, 1280×640).
+private struct SocialCard: View {
+    let model: PlayerModel
+    var body: some View {
+        ZStack {
+            ShotBackdrop()
+            VStack(spacing: 46) {
+                Lockup(iconSize: 104)
+                Overlay(model: model, style: .glass, layout: .coverLine, size: CGSize(width: 600, height: 190))
             }
         }
     }
