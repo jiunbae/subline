@@ -1,6 +1,6 @@
 import AppKit
 import Carbon.HIToolbox
-import NowPlayingCore
+import SublineCore
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -20,29 +20,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             StoreShots.show(args[i + 1])
             return
         }
+        LegacyMigration.run() // previous name ("Now Playing"): preferences, data folder, browser registrations
         var setupError: String?
-        do { try NPPaths.ensureSupportDir() } catch { setupError = "\(NPPaths.supportDir.path): \(error.localizedDescription)" }
+        do { try SublinePaths.ensureSupportDir() } catch { setupError = "\(SublinePaths.supportDir.path): \(error.localizedDescription)" }
         // Single instance: the flock is authoritative; only its holder may unlink/bind the socket.
-        switch NPPaths.acquireInstanceLock() {
+        switch SublinePaths.acquireInstanceLock() {
         case .acquired: break
         case .heldByAnotherInstance:
-            NSLog("NowPlaying: another instance is running")
+            NSLog("Subline: another instance is running")
             exit(0)
         case let .failed(reason):
             // Not "already running": the support folder isn't usable. Say so instead of vanishing.
             let alert = NSAlert()
-            alert.messageText = L10n.string("Now Playing can't start")
+            alert.messageText = L10n.string("Subline can't start")
             alert.informativeText = L10n.format("Its data folder isn't writable:\n%@\n\nCheck the folder's permissions, then open the app again.", setupError ?? reason)
             alert.alertStyle = .critical
             NSApp.activate(ignoringOtherApps: true)
             alert.runModal()
             exit(1)
         }
-        try? FileManager.default.removeItem(at: NPPaths.disabledMarker)
+        try? FileManager.default.removeItem(at: SublinePaths.disabledMarker)
         BackgroundCursor.enable()
         NMRegistrar.registerAll()
         // Keep a previously loaded unpacked copy in sync with this app version.
-        if FileManager.default.fileExists(atPath: NPPaths.unpackedExtensionDir.path) { NMRegistrar.installUnpackedCopy() }
+        if FileManager.default.fileExists(atPath: SublinePaths.unpackedExtensionDir.path) { NMRegistrar.installUnpackedCopy() }
         setup = SetupWindowController(model: model)
         model.openSetup = { [weak self] in self?.setup.show() }
 
@@ -57,7 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         server.onMessage = { [weak self] id, msg in self?.model.handle(conn: id, msg) }
         model.send = { [weak self] msg, conn in self?.server.send(msg, to: conn) }
         do { try server.start() } catch {
-            NSLog("NowPlaying: socket failed: %@", "\(error)")
+            NSLog("Subline: socket failed: %@", "\(error)")
             Diagnostics.shared.socketError = "\(error)"
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.setup.show() } // surface it
         }
@@ -91,7 +92,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Opening the app again (Finder, Spotlight, Launchpad) while it runs shows the setup window,
     /// which doubles as the "is it working?" status page.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        // np-host launches us with `open -g`; when several browsers race, the later ones arrive as a
+        // subline-host launches us with `open -g`; when several browsers race, the later ones arrive as a
         // reopen right after launch. Only treat it as the user opening the app after that window.
         guard ProcessInfo.processInfo.systemUptime - launchedAt > 5 else { return false }
         setup.show()

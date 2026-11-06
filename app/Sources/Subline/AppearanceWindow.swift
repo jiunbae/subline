@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 import ImageIO
-import NowPlayingCore
+import SublineCore
 
 /// Appearance gallery: pick a style and a layout from cards that render the real overlay views
 /// (with the current song when one is playing) over the user's own wallpaper.

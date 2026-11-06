@@ -38,7 +38,7 @@
 "Recently Played" = "최근 재생";
 "Clear Recently Played" = "최근 재생 지우기";
 "Setup…" = "설정…";
-"Quit Now Playing" = "Now Playing 종료";
+"Quit Subline" = "Subline 종료";
 "Caption Language" = "자막 언어";
 "Auto-translate" = "자동 번역";
 "None" = "없음";
@@ -51,7 +51,7 @@
 "Clear" = "투명";
 "%@ (auto-translated)" = "%@ (자동 번역)";
 "just now" = "방금";
-"Now Playing Overlay" = "Now Playing 오버레이";
+"Subline Overlay" = "Subline 오버레이";
 "Transparent, text on Liquid Glass" = "투명 배경과 Liquid Glass 자막";
 "Blurred panel tinted by the artwork" = "커버 색상을 입힌 흐림 패널";
 "No background, shadowed text" = "배경 없이 그림자가 있는 자막";
@@ -91,7 +91,7 @@
 "%@ · %@" = "%@ · %@";
 "%@ — %@" = "%@ — %@";
 "%@ — %@ · %@" = "%@ — %@ · %@";
-"Now Playing can't start" = "Now Playing을 시작할 수 없습니다";
+"Subline can't start" = "Subline을 시작할 수 없습니다";
 "Its data folder isn't writable:\n%@\n\nCheck the folder's permissions, then open the app again." = "데이터 폴더에 쓸 수 없습니다:\n%@\n\n폴더 권한을 확인한 뒤 앱을 다시 여세요.";
 "Connection helper" = "연결 도우미";
 "App connection" = "앱 연결";

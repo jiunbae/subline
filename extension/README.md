@@ -1,8 +1,8 @@
-# Now Playing Chrome extension
+# Subline Chrome extension
 
 No build step or npm dependencies. Requires Chrome 120+ (30-second reconnect alarm watchdog).
 
-1. Build/install the companion macOS app and register `com.nowplaying.host` using the repository's app setup scripts.
+1. Build/install the companion macOS app and register `dev.jiun.subline.host` using the repository's app setup scripts.
 2. Open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and select this `extension/` directory.
 3. Confirm the extension ID is `npkfiaebcfackgbinodgjobdlmeceaij`. The public key is embedded in `manifest.json`; never distribute the private key.
 4. Reload existing YouTube / YouTube Music tabs so the document-start scripts attach. Start playback; the native panel should receive metadata and playback state. Clicking the extension action requests a fresh snapshot.
@@ -28,4 +28,4 @@ node --test extension/test/*.test.mjs
 
 ## Integration checks still required
 
-Real Chrome/native integration is not covered by Node tests. Verify native-host disconnect/restart, hidden-panel clock suppression, SPA next/previous, ad entry/exit, CC restoration, tab close/navigation, YouTube auto captions, YTM artwork/artist selectors, LRCLIB no-match/429 and buffering recovery (see `scripts/e2e/youtube.mjs`; bridge.js itself is covered by `test/bridge.test.mjs`). Player option behavior and CC load latency can change with YouTube updates; the bridge debug log (`localStorage['nowplaying-debug']='1'`) shows what the player accepted.
+Real Chrome/native integration is not covered by Node tests. Verify native-host disconnect/restart, hidden-panel clock suppression, SPA next/previous, ad entry/exit, CC restoration, tab close/navigation, YouTube auto captions, YTM artwork/artist selectors, LRCLIB no-match/429 and buffering recovery (see `scripts/e2e/youtube.mjs`; bridge.js itself is covered by `test/bridge.test.mjs`). Player option behavior and CC load latency can change with YouTube updates; the bridge debug log (`localStorage['subline-debug']='1'`) shows what the player accepted.

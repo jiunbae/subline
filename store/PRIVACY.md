@@ -1,17 +1,17 @@
-# Now Playing: Privacy Policy
+# Subline: Privacy Policy
 
 _Last updated: 2026-11-04_
 
-Now Playing is a Chrome extension ("Now Playing Overlay") and a companion macOS app. Together they
+Subline is a Chrome extension ("Subline") and a companion macOS app. Together they
 show what you are playing on YouTube or YouTube Music in a floating window on your Mac.
 
 ## What is processed
 
 | Data | Where it goes | Why |
 |---|---|---|
-| Title, artist, album, duration, thumbnail URL, play/pause state and position of the video or track in your YouTube / YouTube Music tab | The Now Playing app on **your own Mac**, through Chrome Native Messaging. It is never sent to the developer or any server. | To display it in the overlay |
-| Captions the YouTube player downloads for the current video | The Now Playing app on your Mac | To show time-synced text |
-| Title, artist, album and duration of the current song | **lrclib.net**, a public lyrics database ([lrclib.net](https://lrclib.net)), without cookies — only while the Now Playing app is connected | To find time-synced lyrics |
+| Title, artist, album, duration, thumbnail URL, play/pause state and position of the video or track in your YouTube / YouTube Music tab | The Subline app on **your own Mac**, through Chrome Native Messaging. It is never sent to the developer or any server. | To display it in the overlay |
+| Captions the YouTube player downloads for the current video | The Subline app on your Mac | To show time-synced text |
+| Title, artist, album and duration of the current song | **lrclib.net**, a public lyrics database ([lrclib.net](https://lrclib.net)), without cookies — only while the Subline app is connected | To find time-synced lyrics |
 | Thumbnail images | Downloaded by the app directly from YouTube's image servers (`i.ytimg.com` and related hosts) | To show artwork |
 
 ## What is not done
@@ -19,7 +19,7 @@ show what you are playing on YouTube or YouTube Music in a floating window on yo
 - No accounts, analytics, advertising, telemetry or tracking.
 - No browsing history is read. The extension runs only on `www.youtube.com` and `music.youtube.com`.
 - It never runs in incognito/private windows (the extension declares `incognito: not_allowed`).
-- Without the Now Playing app connected, it sends nothing anywhere.
+- Without the Subline app connected, it sends nothing anywhere.
 - The extension never reads your cookies or YouTube session and never calls YouTube's internal APIs.
   It only reads the captions the YouTube player itself downloads, and switches the player's caption
   track when you choose a language (restoring your own setting afterwards).
@@ -38,7 +38,7 @@ Caption and lyric text is held in memory, never written to disk:
 - in the app, only for the video currently shown.
 
 Developer diagnostics are off by default. If you turn on `debugDump` (see the README), the app writes
-the current title and caption line to `~/Library/Application Support/NowPlaying/debug-state.json`;
+the current title and caption line to `~/Library/Application Support/Subline/debug-state.json`;
 turn it off and delete that file before sharing logs. **Copy Diagnostics** in the setup window copies
 only app/helper/browser-registration status, no titles or captions.
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Removes Now Playing and everything it wrote outside the app bundle.
+# Removes Subline and everything it wrote outside the app bundle.
 # usage: scripts/uninstall.sh [--dry-run] [--yes] [--keep-app]
 #   --dry-run   only list what would be removed
 # Remove the browser extension yourself on the browser's Extensions page.
@@ -11,14 +11,16 @@ done
 AS="$HOME/Library/Application Support"
 targets=()
 apps=()
-for app in "$HOME/Applications/NowPlaying.app" "/Applications/NowPlaying.app"; do
+# Also the previous name (Now Playing / com.nowplaying.*).
+for app in "$HOME/Applications/Subline.app" "/Applications/Subline.app" "$HOME/Applications/NowPlaying.app" "/Applications/NowPlaying.app"; do
   if [[ -d "$app" ]]; then apps+=("$app"); fi
 done
 # The Chrome Web Store ID (if this build had one) names the external-install request file.
 STORE_ID=""
 for app in "${apps[@]:-}"; do
   if [[ -n "$app" && -z "$STORE_ID" ]]; then
-    STORE_ID="$(/usr/libexec/PlistBuddy -c 'Print :NPStoreExtensionID' "$app/Contents/Info.plist" 2>/dev/null || true)"
+    STORE_ID="$(/usr/libexec/PlistBuddy -c 'Print :SLStoreExtensionID' "$app/Contents/Info.plist" 2>/dev/null ||
+                /usr/libexec/PlistBuddy -c 'Print :NPStoreExtensionID' "$app/Contents/Info.plist" 2>/dev/null || true)"
   fi
 done
 if [[ $KEEP_APP -eq 0 ]]; then
@@ -26,22 +28,24 @@ if [[ $KEEP_APP -eq 0 ]]; then
 fi
 for b in "Google/Chrome" "Google/Chrome Beta" "Google/Chrome Dev" "Google/Chrome Canary" "Chromium" \
          "BraveSoftware/Brave-Browser" "Microsoft Edge" "Vivaldi" "Arc/User Data"; do
-  host="$AS/$b/NativeMessagingHosts/com.nowplaying.host.json"
-  if [[ -f "$host" ]]; then targets+=("$host"); fi
+  for host in "$AS/$b/NativeMessagingHosts/dev.jiun.subline.host.json" "$AS/$b/NativeMessagingHosts/com.nowplaying.host.json"; do
+    if [[ -f "$host" ]]; then targets+=("$host"); fi
+  done
   if [[ -n "$STORE_ID" && -f "$AS/$b/External Extensions/$STORE_ID.json" ]]; then
     targets+=("$AS/$b/External Extensions/$STORE_ID.json")
   fi
 done
 # App data: socket, lock, recently played thumbnails, unpacked extension copy, debug dump.
-if [[ -d "$AS/NowPlaying" ]]; then targets+=("$AS/NowPlaying"); fi
+for d in "$AS/Subline" "$AS/NowPlaying"; do if [[ -d "$d" ]]; then targets+=("$d"); fi; done
 if [[ ${#targets[@]} -eq 0 ]]; then echo "Nothing to remove."; exit 0; fi
-printf 'Will remove:\n'; printf '  %s\n' "${targets[@]}"; echo "  preferences: com.nowplaying.app (defaults)"
+printf 'Will remove:\n'; printf '  %s\n' "${targets[@]}"; echo "  preferences: dev.jiun.subline, com.nowplaying.app (defaults)"
 if [[ $DRY -eq 1 ]]; then echo "(dry run: nothing removed)"; exit 0; fi
 if [[ $YES -eq 0 ]]; then
   read -r -p "Proceed? [y/N] " ans
   if [[ "$ans" != [yY]* ]]; then echo "Cancelled."; exit 1; fi
 fi
-pkill -x NowPlaying 2>/dev/null || true
+pkill -x Subline 2>/dev/null || true; pkill -x NowPlaying 2>/dev/null || true
 for t in "${targets[@]}"; do rm -rf "$t"; done
+defaults delete dev.jiun.subline 2>/dev/null || true
 defaults delete com.nowplaying.app 2>/dev/null || true
 echo "Removed. Now remove the extension on the browser's Extensions page."

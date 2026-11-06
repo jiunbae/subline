@@ -38,7 +38,7 @@
 "Recently Played" = "Recently Played";
 "Clear Recently Played" = "Clear Recently Played";
 "Setup…" = "Setup…";
-"Quit Now Playing" = "Quit Now Playing";
+"Quit Subline" = "Quit Subline";
 "Caption Language" = "Caption Language";
 "Auto-translate" = "Auto-translate";
 "None" = "None";
@@ -51,7 +51,7 @@
 "Clear" = "Clear";
 "%@ (auto-translated)" = "%@ (auto-translated)";
 "just now" = "just now";
-"Now Playing Overlay" = "Now Playing Overlay";
+"Subline Overlay" = "Subline Overlay";
 "Transparent, text on Liquid Glass" = "Transparent, text on Liquid Glass";
 "Blurred panel tinted by the artwork" = "Blurred panel tinted by the artwork";
 "No background, shadowed text" = "No background, shadowed text";
@@ -91,7 +91,7 @@
 "%@ · %@" = "%@ · %@";
 "%@ — %@" = "%@ — %@";
 "%@ — %@ · %@" = "%@ — %@ · %@";
-"Now Playing can't start" = "Now Playing can't start";
+"Subline can't start" = "Subline can't start";
 "Its data folder isn't writable:\n%@\n\nCheck the folder's permissions, then open the app again." = "Its data folder isn't writable:\n%@\n\nCheck the folder's permissions, then open the app again.";
 "Connection helper" = "Connection helper";
 "App connection" = "App connection";

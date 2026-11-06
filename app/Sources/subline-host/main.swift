@@ -1,8 +1,8 @@
-// np-host: Chrome Native Messaging host. Relays length-prefixed frames between
-// Chrome (stdin/stdout) and NowPlaying.app (Unix domain socket). Never writes
+// subline-host: Chrome Native Messaging host. Relays length-prefixed frames between
+// Chrome (stdin/stdout) and Subline.app (Unix domain socket). Never writes
 // anything but protocol frames to stdout; diagnostics go to stderr.
 import Foundation
-import NowPlayingCore
+import SublineCore
 #if canImport(Darwin)
 import Darwin
 #endif
@@ -10,9 +10,9 @@ import Darwin
 setvbuf(stdout, nil, _IONBF, 0)
 signal(SIGPIPE, SIG_IGN)
 
-func log(_ s: String) { FileHandle.standardError.write(("np-host: " + s + "\n").data(using: .utf8)!) }
+func log(_ s: String) { FileHandle.standardError.write(("subline-host: " + s + "\n").data(using: .utf8)!) }
 
-/// .app bundle containing this helper (…/NowPlaying.app/Contents/Helpers/np-host).
+/// .app bundle containing this helper (…/Subline.app/Contents/Helpers/subline-host).
 func enclosingApp() -> URL? {
     let exe = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
     let app = exe.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
@@ -25,7 +25,7 @@ func launchApp() {
     if let app = enclosingApp() {
         p.arguments = ["-g", app.path]
     } else {
-        p.arguments = ["-g", "-b", NPPaths.bundleID]
+        p.arguments = ["-g", "-b", SublinePaths.bundleID]
     }
     p.standardOutput = FileHandle.nullDevice // keep stdout clean for NM
     p.standardError = FileHandle.nullDevice
@@ -34,9 +34,9 @@ func launchApp() {
 }
 
 func connectToApp() -> Int32? {
-    let path = NPPaths.socketPath
+    let path = SublinePaths.socketPath
     if let fd = try? UnixSocket.connect(path: path) { return fd }
-    if FileManager.default.fileExists(atPath: NPPaths.disabledMarker.path) {
+    if FileManager.default.fileExists(atPath: SublinePaths.disabledMarker.path) {
         log("app was quit by user; not launching")
         return nil
     }
@@ -52,7 +52,7 @@ func connectToApp() -> Int32? {
 }
 
 guard let sock = connectToApp() else {
-    log("could not reach NowPlaying.app")
+    log("could not reach Subline.app")
     exit(1)
 }
 

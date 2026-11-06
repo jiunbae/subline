@@ -1,13 +1,13 @@
 # Wire protocol v1
 
-Chrome extension (service worker) ⇄ `np-host` (Native Messaging host) ⇄ `NowPlaying.app` (Unix domain socket).
+Chrome extension (service worker) ⇄ `subline-host` (Native Messaging host) ⇄ `Subline.app` (Unix domain socket).
 
 ## Transport
 - Extension ↔ host: Chrome Native Messaging. Each frame is a 4-byte **little-endian** uint32 length followed by UTF-8 JSON.
-- Host ↔ app: the **same framing** over the Unix socket `~/Library/Application Support/NowPlaying/np.sock`. The host is a dumb byte relay. It reframes and validates the length but does not parse the JSON.
+- Host ↔ app: the **same framing** over the Unix socket `~/Library/Application Support/Subline/subline.sock`. The host is a dumb byte relay. It reframes and validates the length but does not parse the JSON.
 - Size limits enforced by the app: 4 MiB per frame in, 64 KiB per frame out.
-- NM host name: `com.nowplaying.host`. Extension ID (fixed via `key` in manifest): `npkfiaebcfackgbinodgjobdlmeceaij`.
-- If the app is not running, the host launches it (`open -g -b com.nowplaying.app`) and retries the connection with backoff for up to about 5 s. If that fails, it exits with code 1 and the extension retries `connectNative` with backoff (1 s, 2 s, 4 s … max 30 s).
+- NM host name: `dev.jiun.subline.host`. Extension ID (fixed via `key` in manifest): `npkfiaebcfackgbinodgjobdlmeceaij`.
+- If the app is not running, the host launches it (`open -g -b dev.jiun.subline`) and retries the connection with backoff for up to about 5 s. If that fails, it exits with code 1 and the extension retries `connectNative` with backoff (1 s, 2 s, 4 s … max 30 s).
 
 ## Common fields
 Every message is a JSON object with `"v": 1` and `"type"`. Messages from the extension also carry `tabId` (number) and `seq` (monotonic per extension session). The app drops any message whose `seq` is ≤ the last `seq` seen for that tab.

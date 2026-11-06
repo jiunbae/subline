@@ -1,14 +1,14 @@
 import Foundation
 
-public enum NPPaths {
-    public static let bundleID = "com.nowplaying.app"
-    public static let hostName = "com.nowplaying.host"
+public enum SublinePaths {
+    public static let bundleID = "dev.jiun.subline"
+    public static let hostName = "dev.jiun.subline.host"
     /// Development (unpacked) extension ID, fixed by the `key` in extension/manifest.json.
     public static let extensionID = "npkfiaebcfackgbinodgjobdlmeceaij"
 
-    /// Chrome Web Store ID, baked into Info.plist (`NPStoreExtensionID`) at build time once published.
+    /// Chrome Web Store ID, baked into Info.plist (`SLStoreExtensionID`) at build time once published.
     public static var storeExtensionID: String? {
-        validExtensionID(Bundle.main.object(forInfoDictionaryKey: "NPStoreExtensionID") as? String)
+        validExtensionID(Bundle.main.object(forInfoDictionaryKey: "SLStoreExtensionID") as? String)
     }
 
     /// Chrome extension IDs are 32 characters in a–p.
@@ -25,9 +25,9 @@ public enum NPPaths {
 
     public static var supportDir: URL {
         FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/NowPlaying", isDirectory: true)
+            .appendingPathComponent("Library/Application Support/Subline", isDirectory: true)
     }
-    public static var socketPath: String { supportDir.appendingPathComponent("np.sock").path }
+    public static var socketPath: String { supportDir.appendingPathComponent("subline.sock").path }
     /// Present while the user has explicitly quit the app; the host then won't auto-launch it.
     public static var disabledMarker: URL { supportDir.appendingPathComponent("user-quit") }
 

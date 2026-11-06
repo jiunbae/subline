@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Feeds synthetic playback to NowPlaying.app through np-host (as the extension would).
+"""Feeds synthetic playback to Subline.app through subline-host (as the extension would).
 
 usage: feed.py MODE SECONDS [--host PATH]
 modes:
@@ -16,7 +16,7 @@ import argparse, json, os, struct, subprocess, time
 
 ap = argparse.ArgumentParser()
 ap.add_argument("mode"); ap.add_argument("seconds", type=float)
-ap.add_argument("--host", default=os.path.expanduser("~/Applications/NowPlaying.app/Contents/Helpers/np-host"))
+ap.add_argument("--host", default=os.path.expanduser("~/Applications/Subline.app/Contents/Helpers/subline-host"))
 a = ap.parse_args()
 p = subprocess.Popen([a.host], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL)
 seq = 0

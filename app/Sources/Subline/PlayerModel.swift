@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 import Observation
-import NowPlayingCore
+import SublineCore
 
 enum OverlayLayout: String, CaseIterable, Identifiable {
     case cover, coverLine, lyrics, mini
@@ -482,7 +482,7 @@ final class PlayerModel {
             title = live.title; artist = live.artist; album = live.album; site = live.site
             artwork = live.artwork; accent = live.accent
         } else {
-            title = "Sunset Drive"; artist = "Now Playing"; site = "ytm"
+            title = "Sunset Drive"; artist = "Lumen Coast"; site = "ytm"
             artwork = Self.sampleArtwork; accent = Color(red: 0.55, green: 0.25, blue: 0.65)
         }
         if live.hasTrack, live.synced, live.cues.count > 2 {
@@ -548,7 +548,7 @@ final class PlayerModel {
         DispatchQueue.main.asyncAfter(deadline: .now() + (tries == 0 ? 2 : 6), execute: work)
     }
 
-    // MARK: Debug (defaults write com.nowplaying.app debugDump -bool true)
+    // MARK: Debug (defaults write dev.jiun.subline debugDump -bool true)
 
     @ObservationIgnored private static let debugDump = UserDefaults.standard.bool(forKey: "debugDump")
     @ObservationIgnored private var lastDumpAt: Double = 0
@@ -567,7 +567,7 @@ final class PlayerModel {
             "extensionOutdated": extensionOutdated.map { "\($0.running)<\($0.bundled)" } ?? "",
         ]
         if let d = try? JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted, .sortedKeys]) {
-            try? d.write(to: NPPaths.supportDir.appendingPathComponent("debug-state.json"), options: .atomic)
+            try? d.write(to: SublinePaths.supportDir.appendingPathComponent("debug-state.json"), options: .atomic)
         }
     }
 

@@ -4,7 +4,7 @@
 # README branding into docs/assets/: banner (1600x560 pt) and social preview at capture resolution, plus the icon.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BIN="$ROOT/build/NowPlaying.app/Contents/MacOS/NowPlaying"
+BIN="$ROOT/build/Subline.app/Contents/MacOS/Subline"
 OUT="$ROOT/store/assets"; mkdir -p "$OUT"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 cat > "$TMP/wid.swift" <<'SW'

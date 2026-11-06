@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const CHANNEL = 'nowplaying-v1';
+  const CHANNEL = 'subline-v1';
   const music = location.hostname === 'music.youtube.com';
   let track = null, main = null, video = null, cues = null, signature = '', captionText = '';
   let visible = true, buffering = false, tick = null, refreshTimer = null, lyricTimer = null;

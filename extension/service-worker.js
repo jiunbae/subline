@@ -1,6 +1,6 @@
 'use strict';
 importScripts('parsers.js');
-const HOST = 'com.nowplaying.host';
+const HOST = 'dev.jiun.subline.host';
 const MATCH = ['https://www.youtube.com/*', 'https://music.youtube.com/*'];
 const states = new Map(), sequences = new Map(), lyricCache = new Map(), inflight = new Map();
 let port = null, retry = null, backoff = 1000, visible = true;
@@ -10,7 +10,7 @@ let nativeReady = false;
 // A wall-clock epoch prevents sequence regression after an MV3 worker restart;
 // increment separately per tab, and never reset at native reconnect/video change.
 const epoch = Date.now() * 1000;
-const RETRY_ALARM = 'nowplaying-native-reconnect';
+const RETRY_ALARM = 'subline-native-reconnect';
 function nextSeq(tabId) {
   const seq = (sequences.get(tabId) ?? epoch) + 1;
   sequences.set(tabId, seq); return seq;

@@ -8,7 +8,7 @@ const root = new URL('../', import.meta.url);
 const source = file => readFileSync(new URL(file, root), 'utf8');
 const plain = value => JSON.parse(JSON.stringify(value));
 const VIDEO = 'dQw4w9WgXcQ';
-const CHANNEL = 'nowplaying-v1';
+const CHANNEL = 'subline-v1';
 const json3 = {events:[{tStartMs:1000, dDurationMs:2000, segs:[{utf8:'Hello world.'}]}]};
 // Drain promise continuations created by fetch/clone/text and the caption command queue.
 const flush = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); };

@@ -6,7 +6,7 @@
 
 ## 2. Build the upload package
 ```bash
-scripts/package-extension.sh      # → build/now-playing-extension-<version>.zip (manifest "key" stripped)
+scripts/package-extension.sh      # → build/subline-extension-<version>.zip (manifest "key" stripped)
 scripts/build-app.sh && scripts/store-assets.sh   # → store/assets/*.png (screenshots, promo tile)
 ```
 

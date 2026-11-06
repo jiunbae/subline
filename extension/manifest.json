@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Now Playing Overlay",
-  "version": "0.5.0",
-  "description": "Send YouTube playback, artwork and captions to the Now Playing macOS overlay.",
+  "name": "Subline",
+  "version": "0.6.0",
+  "description": "Send YouTube playback, artwork and captions to the Subline macOS overlay.",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -25,7 +25,7 @@
     "service_worker": "service-worker.js"
   },
   "action": {
-    "default_title": "Refresh Now Playing connection",
+    "default_title": "Refresh Subline connection",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png"

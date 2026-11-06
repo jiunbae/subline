@@ -13,7 +13,7 @@ function harness(fetchImpl) {
   const tab={id:7,url:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'};
   const runtime={id:'extension-id',lastError:null,onMessage:listener(),getManifest:()=>({version:'0.1.0'}),
     connectNative: name => {
-      assert.equal(name,'com.nowplaying.host');
+      assert.equal(name,'dev.jiun.subline.host');
       const p={onDisconnect:listener(),onMessage:listener(),postMessage:m=>messages.push(plain(m)),disconnect() {}};
       ports.push(p); return p;
     }};
@@ -67,7 +67,7 @@ test('worker rejects stale video clocks, unsafe artwork and untrusted senders',(
 });
 test('alarm wakes reconnection when a disconnected worker timer would be lost',()=>{
   const h=harness();h.ports[0].onDisconnect.callbacks[0]();
-  h.alarms.onAlarm.callbacks[0]({name:'nowplaying-native-reconnect'});
+  h.alarms.onAlarm.callbacks[0]({name:'subline-native-reconnect'});
   assert.equal(h.ports.length,2);
 });
 test('ads suppress cues and tab removal emits gone',()=>{

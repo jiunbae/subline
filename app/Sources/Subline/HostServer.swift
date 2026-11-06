@@ -1,15 +1,15 @@
 import Foundation
-import NowPlayingCore
+import SublineCore
 import Darwin
 
-/// Accepts np-host connections on the Unix socket. All socket I/O happens on a private
+/// Accepts subline-host connections on the Unix socket. All socket I/O happens on a private
 /// serial queue; parsed messages are delivered on the main queue.
 final class HostServer: @unchecked Sendable {
     var onConnect: (@MainActor (Int) -> Void)?
     var onDisconnect: (@MainActor (Int) -> Void)?
     var onMessage: (@MainActor (Int, Incoming) -> Void)?
 
-    private let queue = DispatchQueue(label: "nowplaying.server", qos: .userInitiated)
+    private let queue = DispatchQueue(label: "subline.server", qos: .userInitiated)
     private var listenFD: Int32 = -1
     private var acceptSource: DispatchSourceRead?
     private var conns: [Int: Conn] = [:]
@@ -29,8 +29,8 @@ final class HostServer: @unchecked Sendable {
     private static let maxPending = 256 * 1024
 
     func start() throws {
-        try NPPaths.ensureSupportDir()
-        listenFD = try UnixSocket.listen(path: NPPaths.socketPath)
+        try SublinePaths.ensureSupportDir()
+        listenFD = try UnixSocket.listen(path: SublinePaths.socketPath)
         _ = fcntl(listenFD, F_SETFL, fcntl(listenFD, F_GETFL) | O_NONBLOCK)
         let src = DispatchSource.makeReadSource(fileDescriptor: listenFD, queue: queue)
         src.setEventHandler { [weak self] in self?.acceptPending() }
@@ -42,7 +42,7 @@ final class HostServer: @unchecked Sendable {
         queue.sync {
             acceptSource?.cancel()
             for c in Array(conns.values) { drop(c) }
-            if listenFD >= 0 { close(listenFD); unlink(NPPaths.socketPath) } // safe: we hold the instance lock
+            if listenFD >= 0 { close(listenFD); unlink(SublinePaths.socketPath) } // safe: we hold the instance lock
             listenFD = -1
         }
     }
@@ -127,7 +127,7 @@ final class HostServer: @unchecked Sendable {
                 if let msg = try? Incoming.parse(frame) { parsed.append(msg) }
             }
         } catch {
-            NSLog("NowPlaying: dropping connection %d: %@", c.id, "\(error)")
+            NSLog("Subline: dropping connection %d: %@", c.id, "\(error)")
             drop(c)
             return
         }

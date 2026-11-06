@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/banner.png" alt="Now Playing: floating lyrics and captions for YouTube on your Mac" width="100%">
+  <img src="docs/assets/banner.png" alt="Subline: floating lyrics and captions for YouTube on your Mac" width="100%">
 </p>
 
 <p align="center">
@@ -97,9 +97,9 @@ scripts/build-app.sh --install     # universal build → ~/Applications, then la
 <summary><b>What setup does, in detail</b></summary>
 
 1. On launch the app registers the Native Messaging manifest for every installed Chromium browser
-   (`~/Library/Application Support/<Browser>/NativeMessagingHosts/com.nowplaying.host.json`).
+   (`~/Library/Application Support/<Browser>/NativeMessagingHosts/dev.jiun.subline.host.json`).
 2. Without a Web Store ID the setup window offers **Load Unpacked Extension…**, which copies the bundled extension to
-   `~/Library/Application Support/NowPlaying/extension`, reveals it in Finder and opens `chrome://extensions`.
+   `~/Library/Application Support/Subline/extension`, reveals it in Finder and opens `chrome://extensions`.
    Turn on Developer mode, then **Load unpacked** that folder. The dev ID is fixed as `npkfiaebcfackgbinodgjobdlmeceaij`.
 3. Unpacked extensions keep running old code until reloaded. When the connected extension is older than the
    one bundled with the app, the menu bar menu says so.
@@ -146,8 +146,8 @@ flowchart LR
     P["YouTube player"] -. "caption files it downloads" .-> B["bridge.js<br/>(page)"]
     B --> C["content.js"] --> W["service worker"]
   end
-  W <-- "Native Messaging" --> H["np-host"]
-  H <-- "Unix socket" --> A["NowPlaying.app<br/>(menu bar + overlay)"]
+  W <-- "Native Messaging" --> H["subline-host"]
+  H <-- "Unix socket" --> A["Subline.app<br/>(menu bar + overlay)"]
   W -. "lyrics lookup" .-> L[("lrclib.net")]
 ```
 
@@ -159,10 +159,10 @@ Details: [PROTOCOL.md](PROTOCOL.md) · [PLAN.md](PLAN.md) · [extension/README.m
 
 | | |
 |---|---|
-| **Install** | Unzip `NowPlaying-<version>.zip` (from `scripts/package-app.sh`), move `NowPlaying.app` to `/Applications` or `~/Applications`, open it once and add the extension. Universal (Apple Silicon and Intel), macOS 14 or later; tested on Apple Silicon and the Intel build under Rosetta |
-| **Update** | Quit from the menu bar, replace the app, open it again. Opening it re-registers every browser, so moving it is safe. Reload an unpacked extension on the browser's Extensions page |
-| **Uninstall** | `scripts/uninstall.sh --dry-run` lists everything, `scripts/uninstall.sh` removes the app, browser registrations, Chrome install requests, `~/Library/Application Support/NowPlaying` and preferences. Then remove the extension in the browser |
-| **Language** | Follows the system (English, Korean). Korean for this app only: `defaults write com.nowplaying.app AppleLanguages -array ko` (undo with `defaults delete com.nowplaying.app AppleLanguages`) |
+| **Install** | Unzip `Subline-<version>.zip` (from `scripts/package-app.sh`), move `Subline.app` to `/Applications` or `~/Applications`, open it once and add the extension. Universal (Apple Silicon and Intel), macOS 14 or later; tested on Apple Silicon and the Intel build under Rosetta |
+| **Update** | Quit from the menu bar, replace the app, open it again. Opening it re-registers every browser, so moving it is safe. Reload an unpacked extension on the browser's Extensions page. Coming from the previous name (Now Playing): just open Subline; it moves the preferences, recently played and data folder, and keeps the old browser registration working until the extension reloads |
+| **Uninstall** | `scripts/uninstall.sh --dry-run` lists everything, `scripts/uninstall.sh` removes the app, browser registrations, Chrome install requests, `~/Library/Application Support/Subline` and preferences. Then remove the extension in the browser |
+| **Language** | Follows the system (English, Korean). Korean for this app only: `defaults write dev.jiun.subline AppleLanguages -array ko` (undo with `defaults delete dev.jiun.subline AppleLanguages`) |
 
 ## Performance
 
@@ -208,7 +208,7 @@ for an App Store Connect API key). The marketing version comes from `VERSION`, t
 | `scripts/perf/feed.py MODE SECONDS` | Feeds synthetic states to the app: `lyrics`, `fast`, `none`, `loading`, `gap`, `dual`, `paused` |
 | `scripts/ui/run.sh` | Real pointer input: resize from all 8 handles (cursor + which edges move), Dock placement, context menu |
 | `node scripts/e2e/youtube.mjs <url> [secs] [--cc-off] [--expect cur=es --expect 'n2>0' …] [--expect-cc same] [--debug]` | Real YouTube in Chromium with the unpacked extension; prints the app's state and exits 1 if an expectation fails (needs `debugDump`). `--debug` shows the bridge's log |
-| `localStorage['nowplaying-debug']='1'` (in a YouTube tab's console) | Bridge diagnostics in that tab's console: caption selections, each player attempt, captured / refused (e.g. 429) caption requests. Nothing leaves the page |
+| `localStorage['subline-debug']='1'` (in a YouTube tab's console) | Bridge diagnostics in that tab's console: caption selections, each player attempt, captured / refused (e.g. 429) caption requests. Nothing leaves the page |
 
 `scripts/ui` and `scripts/e2e` move the real pointer / open a browser; they close what they open.
 </details>
@@ -217,7 +217,7 @@ for an App Store Connect API key). The marketing version comes from `VERSION`, t
 <summary><b>Debugging</b></summary>
 
 ```bash
-defaults write com.nowplaying.app debugDump -bool true   # writes state to ~/Library/Application Support/NowPlaying/debug-state.json
+defaults write dev.jiun.subline debugDump -bool true   # writes state to ~/Library/Application Support/Subline/debug-state.json
 ```
 </details>
 

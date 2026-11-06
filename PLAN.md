@@ -1,4 +1,4 @@
-# Now Playing Overlay for YouTube / YouTube Music — 기획서 v0.1
+# Subline for YouTube / YouTube Music — 기획서 v0.1
 
 > Claude(%30)와 Codex 피어(%31)가 Muxa로 각자 조사한 뒤 2라운드에 걸쳐 합의한 내용입니다 (2026-11-04).
 > 표기: ✅ 합의 · ⚠️ 검증 필요 가설 · 🔬 실험 기능
@@ -18,14 +18,14 @@ macOS 화면 위에 PiP처럼 떠 있는 **네이티브 패널**로 보여주는
 ```
 ┌──────────── Chrome ────────────┐        ┌──────────── macOS ─────────────┐
 │ youtube.com / music.youtube.com│        │                                │
-│  ├ MAIN-world bridge (inject)  │        │  NowPlaying.app (LSUIElement)  │
+│  ├ MAIN-world bridge (inject)  │        │  Subline.app (LSUIElement)  │
 │  │  · fetch/XHR 후킹 → 자막 응답 │        │   ├ 메뉴바 아이템                │
 │  │  · player API → 시간/상태     │        │   ├ NSPanel (SwiftUI)          │
 │  │  postMessage                │        │   └ UDS 서버 (owner)            │
 │  ├ content script (isolated)   │        │            ▲                   │
 │  │  · <video> 이벤트, 메타데이터  │        │            │ Unix domain sock │
 │  │  · 사이트별 어댑터(YT / YTM)   │        │            │ (0700 dir/0600)  │
-│  └ service worker              │ stdio  │  Contents/Helpers/np-host      │
+│  └ service worker              │ stdio  │  Contents/Helpers/subline-host      │
 │     · connectNative() ─────────┼───────▶│   (NM host = 얇은 중계 CLI)      │
 └────────────────────────────────┘ JSON   └────────────────────────────────┘
 ```

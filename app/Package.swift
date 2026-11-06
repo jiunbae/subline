@@ -2,13 +2,13 @@
 import PackageDescription
 
 let package = Package(
-    name: "NowPlaying",
+    name: "Subline",
     platforms: [.macOS(.v14)],
     targets: [
-        .target(name: "NowPlayingCore"),
-        .executableTarget(name: "NowPlaying", dependencies: ["NowPlayingCore"]),
-        .executableTarget(name: "np-host", dependencies: ["NowPlayingCore"]),
-        .testTarget(name: "NowPlayingCoreTests", dependencies: ["NowPlayingCore"]),
+        .target(name: "SublineCore"),
+        .executableTarget(name: "Subline", dependencies: ["SublineCore"]),
+        .executableTarget(name: "subline-host", dependencies: ["SublineCore"]),
+        .testTarget(name: "SublineCoreTests", dependencies: ["SublineCore"]),
     ],
     swiftLanguageModes: [.v5]
 )

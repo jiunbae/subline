@@ -1,6 +1,6 @@
 import SwiftUI
 import AppKit
-import NowPlayingCore
+import SublineCore
 
 private let corner: CGFloat = 18
 /// Breathing room around floating pieces (glass/clear) so their SwiftUI shadows aren't clipped by the window.

@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// Renders Chrome Web Store marketing images with the real overlay views (incl. Liquid Glass).
-/// `NowPlaying --store-shot <1|2|3|promo|banner|social>` opens one borderless window of the exact asset size at the
+/// `Subline --store-shot <1|2|3|promo|banner|social>` opens one borderless window of the exact asset size at the
 /// main screen's bottom-left; `scripts/store-assets.sh` captures it. Sample content only: no album art,
 /// wallpaper or song that isn't ours.
 @MainActor
@@ -26,7 +26,7 @@ enum StoreShots {
         let origin = NSScreen.main?.frame.origin ?? .zero
         let w = NSWindow(contentRect: NSRect(origin: origin, size: size), styleMask: [.borderless],
                          backing: .buffered, defer: false)
-        w.title = "NowPlaying Store Shot"
+        w.title = "Subline Store Shot"
         w.isReleasedWhenClosed = false
         w.level = .floating
         w.hasShadow = false
@@ -169,7 +169,7 @@ private struct PromoTile: View {
             HStack(spacing: 22) {
                 Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 132, height: 132)
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Now Playing").font(.system(size: 34, weight: .bold, design: .rounded)).foregroundStyle(.white)
+                    Text("Subline").font(.system(size: 34, weight: .bold, design: .rounded)).foregroundStyle(.white)
                     Text("Floating lyrics\nfor YouTube on Mac").font(.system(size: 17, weight: .medium))
                         .foregroundStyle(.white.opacity(0.75))
                 }
@@ -187,7 +187,7 @@ private struct Lockup: View {
             Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: iconSize, height: iconSize)
                 .shadow(color: .black.opacity(0.35), radius: 18, y: 8)
             VStack(alignment: .leading, spacing: 8) {
-                Text("Now Playing").font(.system(size: iconSize * 0.56, weight: .heavy, design: .rounded))
+                Text("Subline").font(.system(size: iconSize * 0.56, weight: .heavy, design: .rounded))
                     .foregroundStyle(LinearGradient(colors: [.white, Color(red: 1.0, green: 0.83, blue: 0.78)],
                                                     startPoint: .leading, endPoint: .trailing))
                 Text(tagline).font(.system(size: iconSize * 0.2, weight: .medium)).foregroundStyle(.white.opacity(0.75))

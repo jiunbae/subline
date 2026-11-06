@@ -3,12 +3,12 @@
    drives the player's public caption options. */
 (() => {
   'use strict';
-  if (window.__nowPlayingBridge) return;
-  window.__nowPlayingBridge = true;
-  const CHANNEL = 'nowplaying-v1';
-  // Opt-in diagnostics: localStorage['nowplaying-debug'] = '1' in the YouTube tab (no data leaves the page).
-  const debug = (() => { try { return localStorage.getItem('nowplaying-debug') === '1'; } catch { return false; } })();
-  const log = (...args) => { if (debug) console.debug('[nowplaying]', ...args); };
+  if (window.__sublineBridge) return;
+  window.__sublineBridge = true;
+  const CHANNEL = 'subline-v1';
+  // Opt-in diagnostics: localStorage['subline-debug'] = '1' in the YouTube tab (no data leaves the page).
+  const debug = (() => { try { return localStorage.getItem('subline-debug') === '1'; } catch { return false; } })();
+  const log = (...args) => { if (debug) console.debug('[subline]', ...args); };
   const describe = t => t?.languageCode ? t.languageCode + (t.kind === 'asr' ? ':asr' : '') +
     (t.translationLanguage?.languageCode ? '→' + t.translationLanguage.languageCode : '') + (t.vss_id ? '[listed]' : '') : String(t);
   const originalFetch = window.fetch;

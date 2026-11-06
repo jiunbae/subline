@@ -5,13 +5,13 @@
 set -e
 ROOT="${0:A:h:h:h}"; OUT="$ROOT/build/ui-e2e"; mkdir -p "$OUT"
 for t in resize-e2e dock-e2e context-menu-e2e; do swiftc -O -o "$OUT/$t" "$ROOT/scripts/ui/$t.swift" 2>&1 | grep -v warning || true; done
-pgrep -x NowPlaying >/dev/null || { open -g ~/Applications/NowPlaying.app; sleep 3; }
+pgrep -x Subline >/dev/null || { open -g ~/Applications/Subline.app; sleep 3; }
 python3 "$ROOT/scripts/perf/recents.py" save "$ROOT/build/recents.bak"   # synthetic tracks must not pollute Recently Played
-P=$(pgrep -x NowPlaying)
+P=$(pgrep -x Subline)
 python3 "$ROOT/scripts/perf/feed.py" gap 90 >/dev/null 2>&1 & FEED=$!
 sleep 3
 echo "== resize"; "$OUT/resize-e2e" $P 2>&1 | grep -v "linkd\|Connection\]"
 echo "== dock";   "$OUT/dock-e2e" $P 2>&1 | grep -v "linkd\|Connection\]"
 echo "== context menu"; "$OUT/context-menu-e2e" $P "$OUT/context-menu.png" 2>&1 | grep -v "linkd\|Connection\]"; echo "   screenshot: $OUT/context-menu.png"
 kill $FEED 2>/dev/null || true
-pkill -x NowPlaying; sleep 0.5; python3 "$ROOT/scripts/perf/recents.py" restore "$ROOT/build/recents.bak"; open -g ~/Applications/NowPlaying.app
+pkill -x Subline; sleep 0.5; python3 "$ROOT/scripts/perf/recents.py" restore "$ROOT/build/recents.bak"; open -g ~/Applications/Subline.app

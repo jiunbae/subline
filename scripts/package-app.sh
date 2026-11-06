@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds the universal app and zips it for distribution: build/NowPlaying-<version>.zip
+# Builds the universal app and zips it for distribution: build/Subline-<version>.zip
 # (ditto keeps the bundle's signature and extended attributes).
 #
 # Ad-hoc signed by default (runs only on this Mac). For other people's Macs:
@@ -10,10 +10,10 @@
 # With a Developer ID and notary credentials the app is notarized, stapled and zipped again.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-APP="$ROOT/build/NowPlaying.app"
+APP="$ROOT/build/Subline.app"
 "$ROOT/scripts/build-app.sh"
 VERSION="$(tr -d '[:space:]' < "$ROOT/VERSION")"
-OUT="$ROOT/build/NowPlaying-$VERSION.zip"
+OUT="$ROOT/build/Subline-$VERSION.zip"
 zip_app() { rm -f "$OUT"; ditto -c -k --sequesterRsrc --keepParent "$APP" "$OUT"; }
 zip_app
 

@@ -1,5 +1,5 @@
 import AppKit
-import NowPlayingCore
+import SublineCore
 
 @MainActor
 final class StatusMenuController: NSObject, NSMenuDelegate {
@@ -13,7 +13,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         self.model = model
         self.panel = panel
         super.init()
-        item.button?.image = NSImage(systemSymbolName: "music.note", accessibilityDescription: "Now Playing")
+        item.button?.image = NSImage(systemSymbolName: "music.note", accessibilityDescription: "Subline")
         item.button?.image?.isTemplate = true
         menu.delegate = self
         menu.autoenablesItems = false
@@ -204,7 +204,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         }
         menu.addItem(.separator())
         if model.connectionCount > 0 { add("Setup…", #selector(openSetup)) }
-        add("Quit Now Playing", #selector(quit), key: "q")
+        add("Quit Subline", #selector(quit), key: "q")
     }
 
     /// Caption tracks of the current video; the shown one is checked.
@@ -333,8 +333,8 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         if parts.count == 2 { model.pin(TabKey(conn: parts[0], tab: parts[1])) }
     }
     @objc private func quit() {
-        // Tell np-host not to relaunch us until the user opens the app again.
-        try? Data().write(to: NPPaths.disabledMarker)
+        // Tell subline-host not to relaunch us until the user opens the app again.
+        try? Data().write(to: SublinePaths.disabledMarker)
         NSApp.terminate(nil)
     }
 }

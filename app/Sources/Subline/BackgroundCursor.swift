@@ -6,7 +6,7 @@ import Foundation
 ///
 /// Private API, so it is strictly optional:
 /// - resolved at runtime; if a symbol is missing nothing is called,
-/// - `defaults write com.nowplaying.app disablePrivateAPIs -bool true` skips it,
+/// - `defaults write dev.jiun.subline disablePrivateAPIs -bool true` skips it,
 /// - an App Store build (`APPSTORE=1 scripts/build-app.sh`) compiles it out.
 /// Without it everything works the same; only the resize cursor shape isn't shown while
 /// another app is frontmost.
@@ -27,7 +27,7 @@ enum BackgroundCursor {
         let cid = unsafeBitCast(mainSym, to: MainConnection.self)()
         let status = unsafeBitCast(setSym, to: SetProperty.self)(cid, cid, "SetsCursorInBackground" as CFString, kCFBooleanTrue)
         enabled = status == 0
-        if !enabled { NSLog("NowPlaying: background cursor unavailable (status %d)", status) }
+        if !enabled { NSLog("Subline: background cursor unavailable (status %d)", status) }
         return enabled
         #endif
     }

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Packages extension/ for Chrome Web Store upload: build/now-playing-extension-<version>.zip
+# Packages extension/ for Chrome Web Store upload: build/subline-extension-<version>.zip
 # The Web Store rejects a manifest "key" (it assigns its own ID), so it is stripped here only;
 # the repo keeps it so unpacked development builds keep the fixed dev ID.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$ROOT/extension/manifest.json")"
 STAGE="$ROOT/build/extension-store"
-OUT="$ROOT/build/now-playing-extension-$VERSION.zip"
+OUT="$ROOT/build/subline-extension-$VERSION.zip"
 rm -rf "$STAGE" "$OUT"; mkdir -p "$STAGE"
 rsync -a --exclude test --exclude README.md --exclude '.*' "$ROOT/extension/" "$STAGE/"
 python3 - "$STAGE/manifest.json" <<'PY'

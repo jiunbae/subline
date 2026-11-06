@@ -1,5 +1,5 @@
 import AppKit
-import NowPlayingCore
+import SublineCore
 
 /// What the setup window shows when the extension can't reach the app: whether the helper exists,
 /// which browsers got the Native Messaging registration (and why not), and socket problems.
@@ -33,11 +33,11 @@ final class Diagnostics {
 
     /// Plain-text report for support (no browsing data).
     var report: String {
-        var lines = ["Now Playing \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?")",
+        var lines = ["Subline \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?")",
                      "macOS \(ProcessInfo.processInfo.operatingSystemVersionString)",
                      "App: \(Bundle.main.bundlePath)",
                      "Helper: \(helperOK ? "ok" : "MISSING") \(helperPath)",
-                     "Socket: \(socketError ?? "listening at \(NPPaths.socketPath)")",
+                     "Socket: \(socketError ?? "listening at \(SublinePaths.socketPath)")",
                      "Background cursor: \(BackgroundCursor.enabled ? "on" : "off (public API only)")"]
         if registrations.isEmpty { lines.append("Browsers: none found (Chrome, Chromium, Brave, Edge, Vivaldi, Arc)") }
         for r in registrations { lines.append("Browser \(r.browser): \(r.error.map { "FAILED — \($0)" } ?? "registered") \(r.path)") }

@@ -1,5 +1,5 @@
 // Real-YouTube E2E: launches Chromium with the unpacked extension, plays a video and prints the app's
-// state every 2.5 s (requires `defaults write com.nowplaying.app debugDump -bool true`).
+// state every 2.5 s (requires `defaults write dev.jiun.subline debugDump -bool true`).
 // usage: node youtube.mjs <watch URL> [seconds=30] [--cc-off] [--debug] [--expect KEY=VALUE | KEY>N ...] [--expect-cc on|off]
 //   --expect checks the app's final state, e.g. --expect cur=es --expect sub=x-ko --expect n>0 --expect line!=
 //   keys: cur sub n n2 st src line line2 title; exits 1 if any expectation fails.
@@ -22,8 +22,8 @@ const ccOff = process.argv.includes('--cc-off');
 if (!url) { console.error('usage: node youtube.mjs <url> [seconds] [--cc-off]'); process.exit(1); }
 const UD = process.env.PROFILE || path.join(root, 'build/e2e-profile');
 fs.mkdirSync(path.join(UD, 'NativeMessagingHosts'), { recursive: true });
-fs.writeFileSync(path.join(UD, 'NativeMessagingHosts/com.nowplaying.host.json'), JSON.stringify({
-  name: 'com.nowplaying.host', description: 'e2e', path: path.join(os.homedir(), 'Applications/NowPlaying.app/Contents/Helpers/np-host'),
+fs.writeFileSync(path.join(UD, 'NativeMessagingHosts/dev.jiun.subline.host.json'), JSON.stringify({
+  name: 'dev.jiun.subline.host', description: 'e2e', path: path.join(os.homedir(), 'Applications/Subline.app/Contents/Helpers/subline-host'),
   type: 'stdio', allowed_origins: ['chrome-extension://npkfiaebcfackgbinodgjobdlmeceaij/'] }));
 const ext = path.join(root, 'extension');
 // Playwright's bundled Chromium, falling back to the newest one already downloaded.
@@ -47,8 +47,8 @@ const ctx = await chromium.launchPersistentContext(UD, {
 const killer = setTimeout(() => { ctx.close(); process.exit(2); }, (+secs + 90) * 1000); // never leave a browser behind
 const page = ctx.pages()[0] || await ctx.newPage();
 if (argv.includes('--debug')) { // bridge diagnostics → console
-  await page.addInitScript(() => { try { localStorage.setItem('nowplaying-debug', '1'); } catch {} });
-  page.on('console', m => { if (m.text().startsWith('[nowplaying]')) console.log('  ' + m.text()); });
+  await page.addInitScript(() => { try { localStorage.setItem('subline-debug', '1'); } catch {} });
+  page.on('console', m => { if (m.text().startsWith('[subline]')) console.log('  ' + m.text()); });
 }
 const go = async u => { for (let k = 0; k < 3; k++) { try { await page.goto(u, { waitUntil: 'domcontentloaded' }); return; } catch { await page.waitForTimeout(1500); } } };
 const adShowing = () => page.evaluate(() => document.querySelector('#movie_player')?.classList.contains('ad-showing'));
@@ -62,7 +62,7 @@ if (ccOff) { // make the player's own CC preference "off", then start fresh
 }
 const initialCC = await page.getAttribute('.ytp-subtitles-button', 'aria-pressed').catch(() => null);
 await page.evaluate(() => { const v = document.querySelector('video'); if (v) { v.muted = true; v.play().catch(() => {}); } });
-const dumpPath = path.join(os.homedir(), 'Library/Application Support/NowPlaying/debug-state.json');
+const dumpPath = path.join(os.homedir(), 'Library/Application Support/Subline/debug-state.json');
 const dump = () => { try { return JSON.parse(fs.readFileSync(dumpPath, 'utf8')); } catch { return {}; } };
 for (let i = 0; i < Math.ceil(+secs / 2.5); i++) {
   await page.waitForTimeout(2500);

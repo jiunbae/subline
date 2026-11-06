@@ -1,6 +1,6 @@
 import Testing
 import Foundation
-@testable import NowPlayingCore
+@testable import SublineCore
 
 @Suite struct FramingTests {
     @Test func roundTripAcrossChunks() throws {
@@ -177,12 +177,12 @@ import Foundation
 
 @Suite struct PathsTests {
     @Test func storeExtensionIDValidation() {
-        #expect(NPPaths.validExtensionID("npkfiaebcfackgbinodgjobdlmeceaij") == "npkfiaebcfackgbinodgjobdlmeceaij")
-        #expect(NPPaths.validExtensionID("") == nil)
-        #expect(NPPaths.validExtensionID(nil) == nil)
-        #expect(NPPaths.validExtensionID("npkfiaebcfackgbinodgjobdlmeceaiz") == nil) // z is outside a–p
-        #expect(NPPaths.validExtensionID("npkfiaebcfackgbinodgjobdlmecea") == nil)   // too short
-        #expect(NPPaths.allowedExtensionIDs == [NPPaths.extensionID]) // no store ID in the test bundle
+        #expect(SublinePaths.validExtensionID("npkfiaebcfackgbinodgjobdlmeceaij") == "npkfiaebcfackgbinodgjobdlmeceaij")
+        #expect(SublinePaths.validExtensionID("") == nil)
+        #expect(SublinePaths.validExtensionID(nil) == nil)
+        #expect(SublinePaths.validExtensionID("npkfiaebcfackgbinodgjobdlmeceaiz") == nil) // z is outside a–p
+        #expect(SublinePaths.validExtensionID("npkfiaebcfackgbinodgjobdlmecea") == nil)   // too short
+        #expect(SublinePaths.allowedExtensionIDs == [SublinePaths.extensionID]) // no store ID in the test bundle
     }
 }
 
@@ -302,11 +302,11 @@ import Foundation
         // Held by another descriptor → contention.
         let other = open(path, O_RDWR | O_CREAT, 0o600); defer { close(other) }
         #expect(flock(other, LOCK_EX | LOCK_NB) == 0)
-        #expect(NPPaths.acquireInstanceLock(at: path) == .heldByAnotherInstance)
+        #expect(SublinePaths.acquireInstanceLock(at: path) == .heldByAnotherInstance)
         // Unreadable lock file → a real failure with the OS reason.
         let blocked = dir.appendingPathComponent("blocked.lock").path
         FileManager.default.createFile(atPath: blocked, contents: nil, attributes: [.posixPermissions: 0])
-        if case let .failed(reason) = NPPaths.acquireInstanceLock(at: blocked) {
+        if case let .failed(reason) = SublinePaths.acquireInstanceLock(at: blocked) {
             #expect(reason.contains("Permission denied"))
         } else { Issue.record("expected failure") }
     }

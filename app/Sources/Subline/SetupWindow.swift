@@ -1,6 +1,6 @@
 import AppKit
 import SwiftUI
-import NowPlayingCore
+import SublineCore
 
 /// First-run checklist: install the Chrome extension, then play something. Each step turns green on
 /// its own (extension connects → step 1, a track arrives → step 2) and the window closes when done.
@@ -57,7 +57,7 @@ final class SetupWindowController: NSObject, NSWindowDelegate {
     }
 
     static var storeURL: URL? {
-        NPPaths.storeExtensionID.flatMap { URL(string: "https://chromewebstore.google.com/detail/\($0)") }
+        SublinePaths.storeExtensionID.flatMap { URL(string: "https://chromewebstore.google.com/detail/\($0)") }
     }
 
     static func loadUnpacked() {
@@ -83,7 +83,7 @@ private struct SetupView: View {
                 Image(nsImage: NSApp.applicationIconImage)
                     .resizable().frame(width: 52, height: 52)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Now Playing").font(.system(size: 20, weight: .bold))
+                    Text("Subline").font(.system(size: 20, weight: .bold))
                     Text("Floating artwork and synced lyrics for YouTube and YouTube Music.")
                         .font(.system(size: 12)).foregroundStyle(.secondary)
                 }

@@ -1,5 +1,5 @@
 {
-  "name": "nowplaying-e2e",
+  "name": "subline-e2e",
   "private": true,
   "type": "module",
   "description": "Real-YouTube end-to-end checks (Chromium + unpacked extension + installed app)",

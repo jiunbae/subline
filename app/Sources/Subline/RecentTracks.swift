@@ -1,5 +1,5 @@
 import AppKit
-import NowPlayingCore
+import SublineCore
 
 /// A recently played video, kept so an idle overlay can offer to pick up where you left off.
 struct RecentTrack: Codable, Identifiable, Equatable {
@@ -28,7 +28,7 @@ struct RecentTrack: Codable, Identifiable, Equatable {
 enum RecentStore {
     static let limit = 5
     private static let key = "recents"
-    static var thumbDir: URL { NPPaths.supportDir.appendingPathComponent("recents", isDirectory: true) }
+    static var thumbDir: URL { SublinePaths.supportDir.appendingPathComponent("recents", isDirectory: true) }
 
     static func load() -> [RecentTrack] {
         guard let d = UserDefaults.standard.data(forKey: key),
