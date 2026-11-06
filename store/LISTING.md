@@ -34,9 +34,9 @@ Subline app for macOS, which shows it in a small floating window above your othe
 Requires the Subline app for macOS (macOS 14 or later; universal app for Apple Silicon and Intel).
 Without it the extension does nothing and sends nothing. It does not run in incognito windows.
 
-Privacy: no accounts, analytics or tracking. Playback information goes only to the Subline
-app on your Mac. To find synced lyrics, the song title, artist, album and length are sent to
-lrclib.net, a public lyrics database. See the privacy policy for details.
+Privacy: no accounts, analytics or tracking. The extension makes no network requests; playback
+information goes only to the Subline app on your Mac. The app looks up synced lyrics on lrclib.net,
+a public lyrics database (song title, artist, album and length). See the privacy policy for details.
 ```
 
 **Description (ko)**
@@ -55,8 +55,8 @@ Subline는 YouTube나 YouTube Music 탭에서 재생 중인 곡 정보를 macOS�
 macOS용 Subline 앱(macOS 14 이상, Apple Silicon·Intel 공용)이 있어야 동작합니다. 앱이 없으면 아무것도 하지 않고
 아무 데이터도 보내지 않습니다. 시크릿 창에서는 동작하지 않습니다.
 
-개인정보: 계정, 분석, 추적이 없습니다. 재생 정보는 내 Mac의 Subline 앱으로만 갑니다.
-시간 맞춤 가사를 찾을 때만 곡 제목, 아티스트, 앨범, 길이를 공개 가사 데이터베이스 lrclib.net에 보냅니다.
+개인정보: 계정, 분석, 추적이 없습니다. 확장은 네트워크 요청을 하지 않고, 재생 정보는 내 Mac의 Subline 앱으로만 갑니다.
+시간 맞춤 가사는 앱이 공개 가사 데이터베이스 lrclib.net에서 찾습니다(곡 제목, 아티스트, 앨범, 길이).
 ```
 
 ## Privacy practices tab
@@ -72,13 +72,12 @@ macOS용 Subline 앱(macOS 14 이상, Apple Silicon·Intel 공용)이 있어야 
 | `nativeMessaging` | Sends playback state, artwork URLs and captions/lyrics to the user's locally installed Subline macOS app, and receives playback commands from it. This is the extension's only output. |
 | `alarms` | Schedules a reconnect to the local Subline app after it restarts or is launched later, without keeping the service worker alive. |
 | Host `https://www.youtube.com`, `https://music.youtube.com` | Reads the current video/track (title, artist, artwork, position) and the captions the YouTube player itself downloads, switches the player's caption track when the user picks a language, and performs play/pause/seek/next/previous on the user's request. No cookies are read and no requests are made to YouTube. |
-| Host `https://lrclib.net` | Looks up time-synced lyrics for the current song (title, artist, album, length) when YouTube Music doesn't provide synced lyrics — only while the companion app is connected. |
 
 **Remote code:** No, I am not using remote code. All JavaScript is in the package.
 
 **Data usage** (check exactly these):
 
-- ☑ **Website content**. Track title, artist, album, duration and captions/lyrics of the playing video are sent to the user's own Subline app on the same Mac. Title, artist, album and duration are also sent to lrclib.net to look up lyrics.
+- ☑ **Website content**. Track title, artist, album, duration and captions/lyrics of the playing video are sent to the user's own Subline app on the same Mac. The extension itself makes no network requests.
 - ☐ Everything else (personally identifiable info, health, financial, authentication, personal communications, location, web history, user activity) stays **unchecked**.
   - The extension never reads cookies or the YouTube session and makes no requests to YouTube itself; it only observes the caption files the YouTube player downloads.
 

@@ -1,4 +1,5 @@
 import AppKit
+import Observation
 import SublineCore
 
 @MainActor
@@ -8,6 +9,11 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     private let panel: PanelController
     private let menu = NSMenu()
     private var building: NSMenu!   // menu being populated (status menu or a context menu)
+    var notch: NotchController?
+    /// Show the current line next to the menu bar icon.
+    var menuBarLine: Bool = UserDefaults.standard.bool(forKey: "menuBarLine") {
+        didSet { UserDefaults.standard.set(menuBarLine, forKey: "menuBarLine"); updateTitle() }
+    }
 
     init(model: PlayerModel, panel: PanelController) {
         self.model = model
@@ -19,6 +25,8 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         menu.autoenablesItems = false
         item.menu = menu
         panel.contextMenuProvider = { [weak self] in self?.makeContextMenu() ?? NSMenu() }
+        item.button?.imagePosition = .imageLeading
+        trackLine()
         model.showCaptionMenu = { [weak self] in
             guard let self else { return }
             let m = NSMenu(); m.autoenablesItems = false
@@ -30,6 +38,29 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) { populate(menu) }
+
+    /// Keeps the menu bar title in step with the current line (a no-op while the option is off).
+    private func trackLine() {
+        withObservationTracking {
+            _ = model.currentLine; _ = model.hasTrack; _ = model.isPlaying
+        } onChange: { [weak self] in
+            DispatchQueue.main.async { self?.updateTitle(); self?.trackLine() }
+        }
+        updateTitle()
+    }
+
+    private func updateTitle() {
+        guard let button = item.button else { return }
+        var title = ""
+        if menuBarLine, model.hasTrack, !model.isAd {
+            let line = model.currentLine.flatMap { $0.isEmpty ? nil : $0 } ?? model.title
+            title = Self.fit(line, maxWidth: 260)
+        }
+        if button.title != title {
+            button.title = title.isEmpty ? "" : " " + title
+            button.alphaValue = model.isPlaying || title.isEmpty ? 1 : 0.6
+        }
+    }
 
     /// Right-click menu on the overlay: the same items as the menu bar.
     func makeContextMenu() -> NSMenu {
@@ -92,6 +123,18 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         let ct = add("Click-Through", #selector(toggleClickThrough), key: "l", mods: [.control, .option, .command])
         ct.state = model.clickThrough ? .on : .off
 
+        let also = NSMenuItem(title: L10n.string("Also Show Current Line"), action: nil, keyEquivalent: "")
+        let am = NSMenu(); am.autoenablesItems = false
+        let mb = NSMenuItem(title: L10n.string("In the Menu Bar"), action: #selector(toggleMenuBarLine), keyEquivalent: "")
+        mb.target = self; mb.state = menuBarLine ? .on : .off
+        am.addItem(mb)
+        let nt = NSMenuItem(title: L10n.string(NotchController.targetScreen.safeAreaInsets.top > 0 ? "Under the Notch" : "At the Top of the Screen"),
+                            action: #selector(toggleNotch), keyEquivalent: "")
+        nt.target = self; nt.state = notch?.enabled == true ? .on : .off
+        am.addItem(nt)
+        also.submenu = am
+        menu.addItem(also)
+
         let layout = NSMenuItem(title: L10n.string("Layout"), action: nil, keyEquivalent: "")
         let lm = NSMenu()
         for l in OverlayLayout.allCases {
@@ -135,6 +178,8 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
             addCaptionLanguages(to: lm)
             lang.submenu = lm
             cm.addItem(lang)
+        }
+        if !model.captionTracks.isEmpty || (model.synced && !model.cues.isEmpty) {
             let second = NSMenuItem(title: L10n.string("Second Language"), action: nil, keyEquivalent: "")
             let sm2 = NSMenu(); sm2.autoenablesItems = false
             addSecondaryLanguages(to: sm2)
@@ -261,8 +306,27 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         m.addItem(header)
         let off = NSMenuItem(title: L10n.string("None"), action: #selector(pickSecondary(_:)), keyEquivalent: "")
         off.target = self; off.representedObject = ""
-        off.state = model.secondaryTrackID == nil ? .on : .off
+        off.state = model.secondaryTrackID == nil && !DerivedLines.isDerived(model.preferredSecondaryID) ? .on : .off
         m.addItem(off)
+        // Made on this Mac from the main text.
+        let roman = NSMenuItem(title: L10n.string("Romanization"), action: #selector(pickSecondary(_:)), keyEquivalent: "")
+        roman.target = self; roman.representedObject = DerivedLines.romajiID
+        roman.state = model.preferredSecondaryID == DerivedLines.romajiID ? .on : .off
+        roman.isEnabled = DerivedLines.canRomanize(model.cues) || roman.state == .on
+        m.addItem(roman)
+        if DerivedLines.translationSupported {
+            let tr = NSMenuItem(title: L10n.format("Translate on This Mac (%@)", DerivedLines.targetName), action: #selector(pickSecondary(_:)), keyEquivalent: "")
+            tr.target = self; tr.representedObject = DerivedLines.translateID
+            tr.state = model.preferredSecondaryID == DerivedLines.translateID ? .on : .off
+            m.addItem(tr)
+        }
+        if DerivedLines.isDerived(model.preferredSecondaryID), let note = model.derivedNote {
+            let n = NSMenuItem(title: Self.fit("    " + note, maxWidth: 320), action: #selector(downloadLanguages), keyEquivalent: "")
+            n.toolTip = note; n.target = self
+            n.isEnabled = model.pendingDownload != nil
+            m.addItem(n)
+        }
+        if !model.captionTracks.isEmpty { m.addItem(.separator()) }
         for t in model.captionTracks where t.id != model.captionTrackID {
             let i = NSMenuItem(title: Self.fit(t.name), action: #selector(pickSecondary(_:)), keyEquivalent: "")
             i.target = self; i.representedObject = t.id
@@ -353,6 +417,9 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         return i
     }
 
+    @objc private func toggleMenuBarLine() { menuBarLine.toggle() }
+    @objc private func toggleNotch() { notch?.enabled.toggle() }
+    @objc private func downloadLanguages() { model.downloadTranslationLanguages() }
     @objc private func toggleNative() { model.native?.enabled.toggle() }
     @objc private func openAutomationSettings() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation") { NSWorkspace.shared.open(url) }

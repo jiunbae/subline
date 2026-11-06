@@ -105,6 +105,7 @@ public struct CaptionTrackList: Codable, Sendable, Equatable {
 extension CueSet {
     /// Caption track id of this set (matches `CaptionTrack.id`), nil for lyrics.
     public var trackID: String? {
+        if let trackId, trackId.hasPrefix("@") { return trackId } // made on this Mac (romanized / translated)
         guard source == "yt-captions" else { return nil }
         if let trackId, !trackId.isEmpty { return trackId }
         guard let lang, !lang.isEmpty else { return nil }

@@ -364,3 +364,42 @@ import Foundation
         #expect(store.active?.cueSet?.cues.isEmpty == true)
     }
 }
+
+@Suite struct RomanizerTests {
+    @Test func koreanRevisedRomanizationWithLinking() {
+        #expect(Romanizer.romanize("사랑해") == "saranghae")
+        #expect(Romanizer.romanize("한국어") == "hangugeo")
+        #expect(Romanizer.romanize("좋아요") == "joayo")
+        #expect(Romanizer.romanize("싫어 않아") == "sireo ana")
+        #expect(Romanizer.romanize("별로, 신라!") == "byeollo, silla!")
+        #expect(Romanizer.romanize("밤하늘의 별") == "bamhaneurui byeol", "got \(Romanizer.romanize("밤하늘의 별") ?? "nil")")
+    }
+
+    @Test func detectsScriptsAndSkipsLatin() {
+        #expect(Romanizer.romanize("Hello world") == nil)
+        #expect(Romanizer.script(of: "君の名は") == .japanese)
+        #expect(Romanizer.script(of: "你好") == .chinese)
+        #expect(Romanizer.script(of: "東京", japanese: true) == .japanese)
+    }
+
+    @Test func japaneseAndChineseBecomeLatin() throws {
+        let ja = try #require(Romanizer.romanize("ありがとう"))
+        #expect(ja.lowercased().hasPrefix("arigat"))
+        let zh = try #require(Romanizer.romanize("你好"))
+        #expect(zh.contains("nǐ") && zh.contains("hǎo"))
+    }
+}
+
+@Suite struct DerivedSecondaryTests {
+    @Test func pageClearDoesNotRemoveDerivedLineButAppClearDoes() {
+        var store = SessionStore()
+        store.apply(.track(tab: 1, seq: 1, TrackInfo(site: "yt", videoId: "v", title: "T", artist: "A", album: nil, duration: 9, artwork: [], isAd: nil)), conn: 1, now: 0)
+        var derived = CueSet(videoId: "v", source: "romanized", lang: nil, kind: "manual", synced: true, cues: [Cue(s: 1, text: "saranghae")], slot: 2)
+        derived.trackId = "@romaji"
+        store.apply(.cues(tab: 1, seq: nil, derived), conn: 1, now: 1)
+        store.apply(.cues(tab: 1, seq: 2, CueSet(videoId: "v", source: "yt-captions", lang: nil, kind: "manual", synced: true, cues: [], slot: 2)), conn: 1, now: 2)
+        #expect(store.active?.secondaryCueSet?.trackID == "@romaji")
+        store.apply(.cues(tab: 1, seq: nil, CueSet(videoId: "v", source: "derived", lang: nil, kind: "manual", synced: true, cues: [], slot: 2)), conn: 1, now: 3)
+        #expect(store.active?.secondaryCueSet == nil)
+    }
+}

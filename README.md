@@ -44,13 +44,13 @@ Playback stays in your browser. The app only receives metadata, the clock and ca
   <tr>
     <td width="50%" valign="top">
       <h4>🎤 Synced lyrics &amp; captions</h4>
-      YouTube captions captured from the player itself, YouTube Music lyrics from LRCLIB, with the next line previewed.
-      Auto-generated captions are rebuilt into real sentences.
+      YouTube captions captured from the player itself; lyrics from LRCLIB for YouTube Music, Spotify and Apple Music,
+      with the next line previewed. Tap a line to jump there. Wrong lyrics? Pick another version.
     </td>
     <td width="50%" valign="top">
       <h4>🌐 Two languages at once</h4>
-      Pick the caption language, add a second one underneath, or let YouTube auto-translate
-      (e.g. English original + Korean translation). Your choice is remembered.
+      A second line under every line: another caption track, YouTube's auto-translation,
+      <b>romanization</b> (Korean, Japanese, Chinese) or <b>Apple's on-device translation</b> (macOS 26).
     </td>
   </tr>
   <tr>
@@ -69,13 +69,25 @@ Playback stays in your browser. The app only receives metadata, the clock and ca
   </tr>
   <tr>
     <td valign="top">
+      <h4>🎧 Spotify &amp; Apple Music too</h4>
+      Follows the Spotify and Music apps through their own playback notifications: artwork, position,
+      lyrics and controls, nothing to install.
+    </td>
+    <td valign="top">
+      <h4>🏝️ Menu bar &amp; notch</h4>
+      Also show the current line next to the menu bar icon, or in a black island hanging from the MacBook notch
+      (a pill under the menu bar on other screens).
+    </td>
+  </tr>
+  <tr>
+    <td valign="top">
       <h4>🪶 Featherweight</h4>
       ~1% CPU while playing, ~0.03% idle, 25–29 MB. The extension only relays events and adds no measurable cost to the tab.
     </td>
     <td valign="top">
       <h4>🔒 Private by design</h4>
-      No accounts, analytics or cookies. Playback info goes only to the app on your Mac; lyric lookups send
-      title, artist, album and length to lrclib.net. English and Korean UI, VoiceOver support.
+      No accounts, analytics or cookies. The extension makes no network requests; the app looks up lyrics on
+      lrclib.net (title, artist, album, length) and caches them for offline use. English and Korean UI, VoiceOver.
     </td>
   </tr>
 </table>
@@ -135,7 +147,12 @@ Publishing to the Chrome Web Store (unlisted) and the one-click install path: [s
 | Nothing playing | Shown only when you open the overlay yourself (⌃⌥⌘O): the last video with ▶ resume (plays in its tab if still open, otherwise opens it in the default browser) and up to 3 more recent ones. Menu bar → Recently Played lists them and can clear the list (kept on this Mac only) |
 | Paused | The overlay dims and desaturates, with a ❚❚ mark by the title (a pause glyph on Cover); it fades out after 5 min |
 | No text | Cover + Line shows the title larger instead of an empty slot, with a status chip: Loading captions… / Load captions / Show lyrics (unsynced) |
-| Lyrics on YouTube Music | Synced lyrics from LRCLIB (retried with localized/`(Official Audio)` suffixes removed, then one LRCLIB search matched by title, artist and length ±3 s, skipping instrumentals). Songs LRCLIB doesn't have show the title only |
+| Lyrics (YouTube Music, Spotify, Apple Music) | Looked up by the app on LRCLIB (exact match, retried with localized/`(Official Audio)` suffixes removed, then a search matched by title, artist and length ±3 s, skipping instrumentals). Cached on disk, so songs you've heard work offline. Songs LRCLIB doesn't have show the title only |
+| Lyrics versions | Menu → Lyrics: other LRCLIB versions of the song (remembered per song), No Lyrics for This Song, Search Again |
+| Sync per song | Captions → Earlier/Later is remembered for each song or video. Tapping a line in the Lyrics layout plays from it (with that offset) |
+| Romanization / on-device translation | Second Language → Romanization (Korean Revised Romanization, Japanese readings, Pinyin), or Translate on This Mac (Apple Translation, macOS 26; macOS asks once to download the language) |
+| Spotify and Apple Music | Shown like a browser tab, with lyrics and controls (play/pause, next/previous, seek). macOS asks once to allow Automation. Menu → Follow Spotify and Apple Music turns it off |
+| Menu bar / notch | Menu → Also Show Current Line → In the Menu Bar / Under the Notch (on a screen without a notch: At the Top of the Screen) |
 </details>
 
 ## How it works
@@ -148,10 +165,11 @@ flowchart LR
   end
   W <-- "Native Messaging" --> H["subline-host"]
   H <-- "Unix socket" --> A["Subline.app<br/>(menu bar + overlay)"]
-  W -. "lyrics lookup" .-> L[("lrclib.net")]
+  S["Spotify · Music"] -. "playback notifications,<br/>AppleScript" .-> A
+  A -. "lyrics lookup (cached)" .-> L[("lrclib.net")]
 ```
 
-The extension observes the player's own caption requests, so it never calls YouTube itself or reads cookies.
+The extension observes the player's own caption requests, so it never calls YouTube itself, reads cookies or makes any network request.
 The app interpolates the playback clock locally; the tab sends a correction every 5 s plus play/pause/seek events.
 Details: [PROTOCOL.md](PROTOCOL.md) · [PLAN.md](PLAN.md) · [extension/README.md](extension/README.md)
 

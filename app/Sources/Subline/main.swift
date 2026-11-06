@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var hotkeys: HotKeys!
     var setup: SetupWindowController!
     var appearance: AppearanceWindowController!
+    var notch: NotchController!
     let launchedAt = ProcessInfo.processInfo.systemUptime
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -70,6 +71,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         panel = PanelController(model: model)
         menu = StatusMenuController(model: model, panel: panel)
+        notch = NotchController(model: model)
+        menu.notch = notch
         appearance = AppearanceWindowController(model: model, panel: panel)
         model.openAppearance = { [weak self] in self?.appearance.show() }
         model.onPresence = { [weak self] hasTrack, playing, videoId in

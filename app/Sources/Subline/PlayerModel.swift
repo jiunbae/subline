@@ -100,6 +100,8 @@ final class PlayerModel {
     private(set) var lyricsCandidates: [LyricsCandidate] = []
     private(set) var lyricsChosenID: Int?
     private(set) var lyricsSearching = false
+    /// Why the on-device second line isn't shown (e.g. a language still to download), for the menu.
+    private(set) var derivedNote: String?
 
     enum TextStatus: Equatable {
         case timed      // synced cues or live captions
@@ -197,6 +199,22 @@ final class PlayerModel {
     @ObservationIgnored private var lyricsFor: String?
     @ObservationIgnored private var lyricsTask: Task<Void, Never>?
     @ObservationIgnored private var lyricsRetries = 0
+    @ObservationIgnored private var derivedSig: String?
+    /// Language pair waiting for a download (menu: the note item starts it).
+    @ObservationIgnored private(set) var pendingDownload: (String, String)?
+
+    func downloadTranslationLanguages() {
+        #if canImport(Translation)
+        guard let (from, to) = pendingDownload else { return }
+        TranslationDownloader.show(source: from, target: to) { [weak self] in
+            guard let self else { return }
+            self.pendingDownload = nil
+            self.derivedSig = nil
+            self.refresh()
+        }
+        #endif
+    }
+    @ObservationIgnored private var derivedTask: Task<Void, Never>?
 
     /// Remembered caption choice (track id like "ko" or "en:asr"); applied to later videos by language.
     var preferredCaptionID: String? = UserDefaults.standard.string(forKey: "captionTrack") {
@@ -289,6 +307,17 @@ final class PlayerModel {
     func selectSecondary(_ id: String?, remember: Bool = true) {
         guard let k = store.activeKey, let vid = store.active?.track?.videoId else { return }
         if let id, id == captionTrackID { return } // the main track can't also be the sub
+        if DerivedLines.isDerived(id) || (id == nil && DerivedLines.isDerived(secondaryTrackID)) {
+            // Made on this Mac: stop any YouTube sub track, then (re)build from the main text.
+            if remember { preferredSecondaryID = id }
+            if k.conn != NativePlayers.conn, secondaryTrackID != nil, !DerivedLines.isDerived(secondaryTrackID) {
+                send?(.selectCaptions(tab: k.tab, trackID: "", slot: 2), k.conn)
+            }
+            derivedSig = nil; derivedTask?.cancel(); assign(\.derivedNote, nil)
+            clearSecondary(k, vid)
+            refresh()
+            return
+        }
         if remember { preferredSecondaryID = id }
         let tries = (secondarySent[vid].map { $0.id == (id ?? "") ? $0.tries + 1 : 1 } ?? 1)
         secondarySent[vid] = CaptionRequest(id: id ?? "", at: Self.now, tries: remember ? 1 : tries)
@@ -297,6 +326,11 @@ final class PlayerModel {
             assign(\.secondaryCues, []); assign(\.secondaryActiveIndex, nil); assign(\.secondaryTrackID, nil)
             assign(\.secondaryByRow, [])
         }
+    }
+
+    private func clearSecondary(_ k: TabKey, _ vid: String) {
+        let empty = CueSet(videoId: vid, source: "derived", lang: nil, kind: "manual", synced: true, cues: [], slot: 2)
+        store.apply(.cues(tab: k.tab, seq: nil, empty), conn: k.conn, now: Self.now)
     }
 
     func selectCaptions(_ id: String, remember: Bool = true) {
@@ -416,6 +450,7 @@ final class PlayerModel {
         if s.captionTracksKnown && s.captionTracks.isEmpty && captionsLoading { setLoading(false) }
         applyCaptionPreference(s, t)
         applySecondaryPreference(s, t)
+        scheduleDerived(s, t, cueSet)
         recordRecent(t, playing: s.isPlaying)
         loadArtwork(t)
         reschedule()
@@ -434,8 +469,42 @@ final class PlayerModel {
         selectCaptions(target.id, remember: false)
     }
 
+    /// Romanized / translated second line for the current main text (rebuilt when the text changes).
+    private func scheduleDerived(_ s: TabState, _ t: TrackInfo, _ main: CueSet?) {
+        guard let pref = preferredSecondaryID, DerivedLines.isDerived(pref), let main, main.synced, !cues.isEmpty, !(t.isAd ?? false) else { return }
+        let sig = [t.videoId, pref, main.trackID ?? main.source, String(cues.count), cues.first?.text ?? "", String(cues.last?.s ?? 0)].joined(separator: "|")
+        guard sig != derivedSig else { return }
+        derivedSig = sig
+        derivedTask?.cancel()
+        let key = s.key, vid = t.videoId, source = cues, lang = DerivedLines.language(of: cues, hint: main.lang)
+        derivedTask = Task { [weak self] in
+            var out: [Cue] = []
+            var note: String?
+            if pref == DerivedLines.romajiID {
+                out = await Task.detached(priority: .utility) { DerivedLines.romanized(source, lang: lang) }.value
+                if out.isEmpty { note = L10n.string("Nothing to romanize in this text") }
+            } else {
+                switch await DerivedLines.translated(source, source: lang) {
+                case let .cues(c): out = c
+                case let .needsDownload(from, to):
+                    note = L10n.format("Download %@ → %@ for translation…", DerivedLines.name(from), DerivedLines.name(to))
+                    self?.pendingDownload = (from, to)
+                case .sameLanguage: note = L10n.string("Already in your language")
+                case .unavailable: note = L10n.string("Translation isn't available for this language")
+                }
+            }
+            guard !Task.isCancelled, let self, self.store.active?.track?.videoId == vid, self.derivedSig == sig else { return }
+            self.assign(\.derivedNote, note)
+            var set = CueSet(videoId: vid, source: pref == DerivedLines.romajiID ? "romanized" : "apple-translate",
+                             lang: pref == DerivedLines.romajiID ? nil : DerivedLines.targetCode(for: lang), kind: "manual", synced: true, cues: out, slot: 2)
+            set.trackId = pref
+            if self.store.apply(.cues(tab: key.tab, seq: nil, set), conn: key.conn, now: Self.now) { self.refresh() }
+        }
+    }
+
     /// Applies the remembered secondary track once per video, after the main text is in.
     private func applySecondaryPreference(_ s: TabState, _ t: TrackInfo) {
+        if DerivedLines.isDerived(preferredSecondaryID) { return }
         // Retry a request that produced nothing after 10 s, at most twice per video.
         if let r = secondarySent[t.videoId], r.id.isEmpty || r.id == secondaryTrackID || Self.now - r.at < 10 || r.tries >= 2 { return }
         guard t.site == "yt", !(t.isAd ?? false), s.isPlaying,
@@ -596,6 +665,10 @@ final class PlayerModel {
     private func scheduleLyrics(_ s: TabState, _ t: TrackInfo) {
         guard lyricsFor != t.videoId else { return }
         guard let q = lyricsQuery(t) else { return } // duration may arrive later: try again then
+        // A page reports its own text first (YouTube Music sends an empty placeholder); wait for that,
+        // so lyrics the page already has are never raced. Spotify/Music have no text of their own.
+        let fromPage = s.key.conn != NativePlayers.conn
+        if fromPage, s.cueSet?.videoId != t.videoId { return }
         if let cs = s.cueSet, cs.videoId == t.videoId, cs.synced, !cs.cues.isEmpty, cs.source != "lrclib" { return }
         lyricsFor = t.videoId
         lyricsRetries = 0
@@ -680,7 +753,7 @@ final class PlayerModel {
             "connections": connectionCount,
             "captionTracks": captionTracks.map(\.id), "captionTrackID": captionTrackID ?? "",
             "textStatus": "\(textStatus)", "captionsLoading": captionsLoading,
-            "secondaryTrackID": secondaryTrackID ?? "", "secondaryCount": secondaryCues.count, "secondaryLine": secondaryLine ?? "",
+            "secondaryTrackID": secondaryTrackID ?? "", "derivedNote": derivedNote ?? "", "preferredSecondary": preferredSecondaryID ?? "", "secondaryCount": secondaryCues.count, "secondaryLine": secondaryLine ?? "",
             "extensionOutdated": extensionOutdated.map { "\($0.running)<\($0.bundled)" } ?? "",
         ]
         if let d = try? JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted, .sortedKeys]) {

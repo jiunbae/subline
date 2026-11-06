@@ -74,6 +74,9 @@ public struct SessionStore: Sendable {
         case let .cues(tab, seq, set):
             return mutate(TabKey(conn: conn, tab: tab), seq: seq, now: now, videoId: set.videoId) { s in
                 if set.isSecondary {
+                    // The page clearing its own sub track must not remove a line made on this Mac.
+                    if set.cues.isEmpty, let cur = s.secondaryCueSet, cur.trackID?.hasPrefix("@") == true,
+                       !(set.source == "derived" || set.trackID?.hasPrefix("@") == true) { return }
                     s.secondaryCueSet = set.cues.isEmpty ? nil : set
                     s.secondaryTimeline = set.cues.isEmpty ? .empty : CueTimeline(cues: set.cues, synced: set.synced)
                 } else {
