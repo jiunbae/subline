@@ -80,6 +80,15 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         add(panel.isVisible ? "Hide Overlay" : "Show Overlay", #selector(toggleOverlay), key: "o", mods: [.control, .option, .command])
         let autoShow = add("Show Automatically While Playing", #selector(toggleAutoPresence))
         autoShow.state = panel.autoPresence ? .on : .off
+        if let native = model.native {
+            let n = add("Follow Spotify and Apple Music", #selector(toggleNative))
+            n.state = native.enabled ? .on : .off
+            if !native.denied.isEmpty {
+                let warn = NSMenuItem(title: L10n.string("    Allow in System Settings › Privacy & Security › Automation"), action: #selector(openAutomationSettings), keyEquivalent: "")
+                warn.target = self
+                building.addItem(warn)
+            }
+        }
         let ct = add("Click-Through", #selector(toggleClickThrough), key: "l", mods: [.control, .option, .command])
         ct.state = model.clickThrough ? .on : .off
 
@@ -344,6 +353,10 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         return i
     }
 
+    @objc private func toggleNative() { model.native?.enabled.toggle() }
+    @objc private func openAutomationSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation") { NSWorkspace.shared.open(url) }
+    }
     @objc private func togglePlay() { model.command("toggle") }
     @objc private func next() { model.command("next") }
     @objc private func prev() { model.command("prev") }

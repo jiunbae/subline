@@ -6,6 +6,7 @@ import SublineCore
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let model = PlayerModel()
     let server = HostServer()
+    let native = NativePlayers()
     var panel: PanelController!
     var menu: StatusMenuController!
     var hotkeys: HotKeys!
@@ -56,7 +57,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         server.onDisconnect = { [weak self] id in self?.model.disconnected(id) }
         server.onMessage = { [weak self] id, msg in self?.model.handle(conn: id, msg) }
-        model.send = { [weak self] msg, conn in self?.server.send(msg, to: conn) }
+        model.send = { [weak self] msg, conn in
+            if conn == NativePlayers.conn { self?.native.handle(msg) } else { self?.server.send(msg, to: conn) }
+        }
+        native.onMessage = { [weak self] msg in self?.model.handle(conn: NativePlayers.conn, msg) }
+        model.native = native
         do { try server.start() } catch {
             NSLog("Subline: socket failed: %@", "\(error)")
             Diagnostics.shared.socketError = "\(error)"
@@ -71,6 +76,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.panel.presence(hasTrack: hasTrack, playing: playing, videoId: videoId)
         }
         panel.start()
+        native.start()
         if CommandLine.arguments.contains("--appearance") { appearance.show() }
         // First run (no extension has ever connected): show the setup checklist instead of an empty overlay.
         if !UserDefaults.standard.bool(forKey: "everConnected") {

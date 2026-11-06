@@ -1,5 +1,6 @@
 import AppKit
 import ImageIO
+import SublineCore
 
 /// Downloads artwork, downsamples it once to display size, and extracts an accent color.
 actor ArtworkLoader {
@@ -54,7 +55,12 @@ actor ArtworkLoader {
     private let capacity = 3
     private let maxPixel = 720
 
-    private static let allowedHosts = ["i.ytimg.com", "i9.ytimg.com", "yt3.ggpht.com", "yt3.googleusercontent.com", "lh3.googleusercontent.com"]
+    /// Artwork files the app itself saved under its data folder.
+    static func isLocalArtwork(_ url: URL) -> Bool {
+        url.isFileURL && url.standardizedFileURL.path.hasPrefix(NativePlayers.artworkDir.standardizedFileURL.path + "/")
+    }
+
+    private static let allowedHosts = ["i.scdn.co", "i.ytimg.com", "i9.ytimg.com", "yt3.ggpht.com", "yt3.googleusercontent.com", "lh3.googleusercontent.com"]
 
     func load(urls: [String]) async -> Result? {
         for s in urls {
@@ -62,8 +68,14 @@ actor ArtworkLoader {
                 order.removeAll { $0 == s }; order.append(s) // true LRU: a hit refreshes recency
                 return hit
             }
-            guard let url = URL(string: s), Self.isAllowed(url) else { continue }
-            guard let data = await fetch(url), let r = decode(data) else { continue }
+            guard let url = URL(string: s) else { continue }
+            let data: Data?
+            if Self.isLocalArtwork(url) {
+                data = try? Data(contentsOf: url) // Apple Music artwork, written by NativePlayers
+            } else if Self.isAllowed(url) {
+                data = await fetch(url)
+            } else { continue }
+            guard let data, data.count <= Self.maxBytes, let r = decode(data) else { continue }
             insert(s, r)
             return r
         }

@@ -116,3 +116,5 @@
 "Lyrics from LRCLIB" = "가사 제공: LRCLIB";
 "lrclib" = "LRCLIB";
 "Sync for this song: %+.1fs" = "이 곡 싱크: %+.1f초";
+"Follow Spotify and Apple Music" = "Spotify·Apple Music도 따라가기";
+"    Allow in System Settings › Privacy & Security › Automation" = "    시스템 설정 › 개인정보 보호 및 보안 › 자동화에서 허용";

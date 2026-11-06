@@ -11,6 +11,8 @@ struct RecentTrack: Codable, Identifiable, Equatable {
     var id: String { videoId }
 
     var url: URL? {
+        if site == "spotify" { return URL(string: videoId) } // spotify:track:… opens the Spotify app
+        if site == "music" { return nil }
         let base = site == "ytm" ? "https://music.youtube.com/watch?v=" : "https://www.youtube.com/watch?v="
         return URL(string: base + videoId)
     }

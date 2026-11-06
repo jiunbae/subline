@@ -23,6 +23,11 @@ public struct TrackInfo: Codable, Sendable, Equatable {
     public var duration: Double?
     public var artwork: [Artwork]
     public var isAd: Bool?
+    public init(site: String, videoId: String, title: String, artist: String, album: String?, duration: Double?,
+                artwork: [Artwork], isAd: Bool?) {
+        self.site = site; self.videoId = videoId; self.title = title; self.artist = artist
+        self.album = album; self.duration = duration; self.artwork = artwork; self.isAd = isAd
+    }
 }
 
 public struct ClockInfo: Codable, Sendable, Equatable {
@@ -31,6 +36,9 @@ public struct ClockInfo: Codable, Sendable, Equatable {
     public var rate: Double
     public var paused: Bool
     public var buffering: Bool?
+    public init(videoId: String, t: Double, rate: Double, paused: Bool, buffering: Bool?) {
+        self.videoId = videoId; self.t = t; self.rate = rate; self.paused = paused; self.buffering = buffering
+    }
 }
 
 public struct CueSet: Codable, Sendable, Equatable {

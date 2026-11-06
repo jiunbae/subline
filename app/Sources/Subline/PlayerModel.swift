@@ -156,6 +156,8 @@ final class PlayerModel {
 
     @ObservationIgnored private(set) var store = SessionStore()
     @ObservationIgnored var send: ((Outgoing, Int?) -> Void)?
+    /// Spotify / Apple Music source (menu toggle).
+    @ObservationIgnored var native: NativePlayers?
     /// Fired after every state projection: (hasTrack, isPlaying, videoId). Drives overlay auto show/hide.
     @ObservationIgnored var onPresence: ((Bool, Bool, String?) -> Void)?
     /// Opens the setup window (wired by the app delegate).
@@ -364,6 +366,7 @@ final class PlayerModel {
             assign(\.lyricsSearching, false)
             timer?.cancel()
             onPresence?(false, false, nil)
+            if Self.debugDump { dumpState() }
             return
         }
         if currentVideo != t.videoId {

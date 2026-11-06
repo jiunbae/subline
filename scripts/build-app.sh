@@ -47,6 +47,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSSupportsAutomaticGraphicsSwitching</key><true/>
+  <key>NSAppleEventsUsageDescription</key><string>Subline reads what Spotify or Music is playing (title, position, artwork) to show its lyrics, and sends play/pause/next/previous when you use the overlay controls.</string>
 </dict></plist>
 PLIST
 # Ad-hoc sign by default. For distribution set CODESIGN_IDENTITY to a Developer ID identity
@@ -55,7 +56,7 @@ IDENTITY="${CODESIGN_IDENTITY:--}"
 SIGN_FLAGS=(--force --options runtime --sign "$IDENTITY")
 [[ "$IDENTITY" != "-" ]] && SIGN_FLAGS+=(--timestamp)
 codesign "${SIGN_FLAGS[@]}" "$APP/Contents/Helpers/subline-host"
-codesign "${SIGN_FLAGS[@]}" "$APP"
+codesign "${SIGN_FLAGS[@]}" --entitlements "$ROOT/app/Subline.entitlements" "$APP"
 echo "built $APP"
 
 if [[ "${1:-}" == "--install" ]]; then
