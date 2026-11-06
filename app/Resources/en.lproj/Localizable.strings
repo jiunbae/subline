@@ -108,3 +108,11 @@
 "Plays from this line" = "Plays from this line";
 "Skip Back 10 Seconds" = "Skip Back 10 Seconds";
 "Skip Forward 10 Seconds" = "Skip Forward 10 Seconds";
+"Lyrics Version" = "Lyrics Version";
+"Looking for lyrics…" = "Looking for lyrics…";
+"No synced lyrics found" = "No synced lyrics found";
+"No Lyrics for This Song" = "No Lyrics for This Song";
+"Search Again" = "Search Again";
+"Lyrics from LRCLIB" = "Lyrics from LRCLIB";
+"lrclib" = "LRCLIB";
+"Sync for this song: %+.1fs" = "Sync for this song: %+.1fs";

@@ -138,7 +138,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
                              action: nil, keyEquivalent: "")
         src.isEnabled = false
         cm.addItem(src)
-        let off = NSMenuItem(title: L10n.format("Delay: %+.1fs", model.captionOffset), action: nil, keyEquivalent: "")
+        let off = NSMenuItem(title: L10n.format("Sync for this song: %+.1fs", model.captionOffset), action: nil, keyEquivalent: "")
         off.isEnabled = false
         cm.addItem(off)
         for (title, delta) in [("Earlier (−0.5s)", -0.5), ("Later (+0.5s)", 0.5)] {
@@ -164,6 +164,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         cm.addItem(nextLine)
         cap.submenu = cm
         menu.addItem(cap)
+        if model.lyricsAvailable { addLyricsMenu(to: menu) }
 
         // Tab selection
         let tabs = model.tabs.filter { $0.track != nil }
@@ -262,6 +263,48 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         addTranslations(to: m, current: model.secondaryTrackID, action: #selector(pickSecondary(_:)),
                         excluding: model.captionTrackID)
     }
+
+    /// LRCLIB versions of the current song: pick another (remembered per song), none, or search again.
+    private func addLyricsMenu(to menu: NSMenu) {
+        let item = NSMenuItem(title: L10n.string("Lyrics"), action: nil, keyEquivalent: "")
+        let m = NSMenu(); m.autoenablesItems = false
+        let header = NSMenuItem(title: L10n.string(model.lyricsSearching ? "Looking for lyrics…" : "Lyrics Version"), action: nil, keyEquivalent: "")
+        header.isEnabled = false
+        m.addItem(header)
+        if model.lyricsCandidates.isEmpty && !model.lyricsSearching {
+            let none = NSMenuItem(title: L10n.string("No synced lyrics found"), action: nil, keyEquivalent: "")
+            none.isEnabled = false
+            m.addItem(none)
+        }
+        for c in model.lyricsCandidates {
+            let len = String(format: "%d:%02d", Int(c.duration) / 60, Int(c.duration) % 60)
+            let full = [c.trackName, c.artistName, c.albumName].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " — ") + " (\(len))"
+            let i = NSMenuItem(title: Self.fit(full, maxWidth: 300), action: #selector(pickLyrics(_:)), keyEquivalent: "")
+            i.toolTip = full
+            i.target = self; i.representedObject = c.id
+            i.state = model.lyricsChosenID == c.id && model.cueSource == "lrclib" ? .on : .off
+            m.addItem(i)
+        }
+        m.addItem(.separator())
+        let hide = NSMenuItem(title: L10n.string("No Lyrics for This Song"), action: #selector(pickLyrics(_:)), keyEquivalent: "")
+        hide.target = self; hide.representedObject = -1
+        hide.isEnabled = model.cueSource == "lrclib" && !model.cues.isEmpty
+        m.addItem(hide)
+        let again = NSMenuItem(title: L10n.string("Search Again"), action: #selector(searchLyricsAgain), keyEquivalent: "")
+        again.target = self
+        m.addItem(again)
+        let credit = NSMenuItem(title: L10n.string("Lyrics from LRCLIB"), action: nil, keyEquivalent: "")
+        credit.isEnabled = false
+        m.addItem(credit)
+        item.submenu = m
+        menu.addItem(item)
+    }
+
+    @objc private func pickLyrics(_ s: NSMenuItem) {
+        guard let id = s.representedObject as? Int else { return }
+        model.chooseLyrics(id < 0 ? nil : id)
+    }
+    @objc private func searchLyricsAgain() { model.searchLyricsAgain() }
 
     @objc private func resumeRecent(_ s: NSMenuItem) {
         if let id = s.representedObject as? String, let r = model.recents.first(where: { $0.videoId == id }) { model.resume(r) }

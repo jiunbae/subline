@@ -311,3 +311,56 @@ import Foundation
         } else { Issue.record("expected failure") }
     }
 }
+
+@Suite struct LyricsTests {
+    @Test func lrcMultipleTimestampsFractionsMetadataCRLFAndFinalDuration() {
+        let cues = Lyrics.parseLRC("[ar:Artist]\r\n[00:01.25][00:03.500]Hi\r\n[00:05]Bye", duration: 8)
+        #expect(cues == [Cue(s: 1.25, e: 3.5, text: "Hi"), Cue(s: 3.5, e: 5, text: "Hi"), Cue(s: 5, e: 8, text: "Bye")])
+    }
+
+    @Test func lrcOffsetClampsAndIgnoresMalformed() {
+        let cues = Lyrics.parseLRC("[offset:-500]\n[00:00.20]First\n[00:70]bad\n[00:02:5]Second", duration: 5)
+        #expect(cues == [Cue(s: 0, e: 2, text: "First"), Cue(s: 2, e: 5, text: "Second")])
+        #expect(Lyrics.parseLRC("plain lyrics without timestamps", duration: nil).isEmpty)
+    }
+
+    @Test func queryCleansLocalizedAndDecorativeSuffixes() {
+        let q = LyricsQuery(title: "Song (Official Audio)", artist: "The Band(더 밴드) - Topic", album: nil, duration: 110)
+        #expect(q.attempts.count == 2)
+        #expect(q.attempts[1].title == "Song" && q.attempts[1].artist == "The Band")
+        #expect(q.cacheKey == LyricsQuery(title: "song (official audio)", artist: "THE BAND(더 밴드) - topic", album: "x", duration: 110.4).cacheKey)
+    }
+
+    @Test func candidatesNeedIdentityAndSyncedTextAndRankExactTitleFirst() {
+        func r(_ id: Int, _ t: String, _ a: String, _ d: Double, synced: String? = "[00:01]x", instrumental: Bool? = nil) -> LRCLIBRecord {
+            LRCLIBRecord(id: id, trackName: t, artistName: a, albumName: nil, duration: d, instrumental: instrumental, syncedLyrics: synced)
+        }
+        let q = LyricsQuery(title: "Song (Official Video)", artist: "The Band", album: nil, duration: 180)
+        let ranked = Lyrics.rankCandidates([
+            r(1, "Song (Live)", "Band", 186),
+            r(2, "Song", "The Band", 181, instrumental: true),
+            r(3, "Song", "Other", 182),
+            r(4, "Song", "The Band", 181),
+            r(5, "Song", "The Band", 183, synced: nil),
+            r(6, "Completely Different", "The Band", 180),
+        ], for: q)
+        #expect(ranked.map(\.id) == [4, 1])
+        // Auto pick: within ±3 s only, so the live version is offered but not shown by itself.
+        #expect(Lyrics.autoPick(exact: nil, ranked: ranked, for: q)?.id == 4)
+        #expect(Lyrics.autoPick(exact: nil, ranked: [ranked[1]], for: q) == nil)
+    }
+
+    @Test func appFoundLyricsSurvivePagePlaceholders() throws {
+        var store = SessionStore()
+        let track = TrackInfo(site: "ytm", videoId: "v", title: "T", artist: "A", album: nil, duration: 100, artwork: [], isAd: nil)
+        store.apply(.track(tab: 1, seq: 1, track), conn: 1, now: 0)
+        let lrc = CueSet(videoId: "v", source: "lrclib", lang: nil, kind: "lyrics", synced: true, cues: [Cue(s: 1, text: "hello")])
+        store.apply(.cues(tab: 1, seq: nil, lrc), conn: 1, now: 1)
+        let placeholder = CueSet(videoId: "v", source: "ytm-lyrics", lang: nil, kind: "lyrics", synced: true, cues: [])
+        store.apply(.cues(tab: 1, seq: 2, placeholder), conn: 1, now: 2)
+        #expect(store.active?.cueSet?.source == "lrclib")
+        // The app itself can clear them ("No Lyrics").
+        store.apply(.cues(tab: 1, seq: nil, CueSet(videoId: "v", source: "lrclib", lang: nil, kind: "lyrics", synced: true, cues: [])), conn: 1, now: 3)
+        #expect(store.active?.cueSet?.cues.isEmpty == true)
+    }
+}

@@ -96,6 +96,10 @@ final class PlayerModel {
     private(set) var captionTrackID: String?
     /// A caption fetch was requested and nothing has arrived yet.
     private(set) var captionsLoading = false
+    /// LRCLIB versions for the current song, the one shown, and whether a lookup is running.
+    private(set) var lyricsCandidates: [LyricsCandidate] = []
+    private(set) var lyricsChosenID: Int?
+    private(set) var lyricsSearching = false
 
     enum TextStatus: Equatable {
         case timed      // synced cues or live captions
@@ -108,7 +112,7 @@ final class PlayerModel {
         if isAd { return .none }
         if liveCaption != nil || (synced && !cues.isEmpty) { return .timed }
         if !cues.isEmpty { return .unsynced }
-        if captionsLoading { return .loading }
+        if captionsLoading || lyricsSearching { return .loading }
         if site == "yt" && !captionTracks.isEmpty { return .available }
         return .none
     }
@@ -130,8 +134,25 @@ final class PlayerModel {
     var autoCaptions: Bool = UserDefaults.standard.object(forKey: "autoCaptions") as? Bool ?? true {
         didSet { UserDefaults.standard.set(autoCaptions, forKey: "autoCaptions"); refresh() }
     }
-    /// Caption delay in seconds: positive shows text later, negative earlier.
-    var captionOffset: Double = 0 { didSet { reschedule() } }
+    /// Caption delay in seconds: positive shows text later, negative earlier. Remembered per song/video.
+    var captionOffset: Double = 0 {
+        didSet {
+            reschedule()
+            guard let k = offsetKey, !loadingOffset else { return }
+            var all = UserDefaults.standard.dictionary(forKey: "syncOffsets") as? [String: Double] ?? [:]
+            all[k] = abs(captionOffset) < 0.001 ? nil : captionOffset
+            if all.count > 500 { all = Dictionary(uniqueKeysWithValues: all.prefix(400).map { ($0.key, $0.value) }) }
+            UserDefaults.standard.set(all, forKey: "syncOffsets")
+        }
+    }
+    @ObservationIgnored private var offsetKey: String?
+    @ObservationIgnored private var loadingOffset = false
+
+    /// Seeks so that cue `i` is the current line (accounts for the sync offset).
+    func seek(toCue i: Int) {
+        guard synced, cues.indices.contains(i) else { return }
+        command("seek", t: max(0, cues[i].s + captionOffset + 0.01))
+    }
 
     @ObservationIgnored private(set) var store = SessionStore()
     @ObservationIgnored var send: ((Outgoing, Int?) -> Void)?
@@ -170,6 +191,10 @@ final class PlayerModel {
     @ObservationIgnored private var autoCaptionWork: DispatchWorkItem?
     @ObservationIgnored private let artworkLoader = ArtworkLoader()
     @ObservationIgnored private var artworkTask: Task<Void, Never>?
+    @ObservationIgnored private let lyricsService = LyricsService()
+    @ObservationIgnored private var lyricsFor: String?
+    @ObservationIgnored private var lyricsTask: Task<Void, Never>?
+    @ObservationIgnored private var lyricsRetries = 0
 
     /// Remembered caption choice (track id like "ko" or "en:asr"); applied to later videos by language.
     var preferredCaptionID: String? = UserDefaults.standard.string(forKey: "captionTrack") {
@@ -336,13 +361,18 @@ final class PlayerModel {
             assign(\.translations, [])
             assign(\.captionTrackID, nil)
             setLoading(false)
+            assign(\.lyricsSearching, false)
             timer?.cancel()
             onPresence?(false, false, nil)
             return
         }
         if currentVideo != t.videoId {
             currentVideo = t.videoId
-            if captionOffset != 0 { captionOffset = 0 }
+            offsetKey = t.site + ":" + t.videoId
+            let saved = (UserDefaults.standard.dictionary(forKey: "syncOffsets") as? [String: Double])?[offsetKey!] ?? 0
+            loadingOffset = true
+            if captionOffset != saved { captionOffset = saved }
+            loadingOffset = false
         }
         assign(\.hasTrack, true)
         assign(\.title, t.title)
@@ -387,6 +417,7 @@ final class PlayerModel {
         loadArtwork(t)
         reschedule()
         scheduleAutoCaptions(s, t)
+        scheduleLyrics(s, t)
         onPresence?(true, s.isPlaying, t.videoId)
         if Self.debugDump, Self.now - lastDumpAt > 0.5 { lastDumpAt = Self.now; dumpState() } // ≤2 writes/s
     }
@@ -547,6 +578,89 @@ final class PlayerModel {
         autoCaptionWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + (tries == 0 ? 2 : 6), execute: work)
     }
+
+    // MARK: Lyrics (LRCLIB, looked up by the app for YouTube Music, Spotify and Apple Music)
+
+    static let lyricsSites: Set<String> = ["ytm", "spotify", "music"]
+
+    private func lyricsQuery(_ t: TrackInfo) -> LyricsQuery? {
+        guard Self.lyricsSites.contains(t.site), !(t.isAd ?? false), !t.title.isEmpty, !t.artist.isEmpty,
+              let d = t.duration, d > 0 else { return nil }
+        return LyricsQuery(title: t.title, artist: t.artist, album: t.album, duration: d)
+    }
+
+    /// Once per song; skipped when the page already sent synced lyrics of its own.
+    private func scheduleLyrics(_ s: TabState, _ t: TrackInfo) {
+        guard lyricsFor != t.videoId else { return }
+        guard let q = lyricsQuery(t) else { return } // duration may arrive later: try again then
+        if let cs = s.cueSet, cs.videoId == t.videoId, cs.synced, !cs.cues.isEmpty, cs.source != "lrclib" { return }
+        lyricsFor = t.videoId
+        lyricsRetries = 0
+        assign(\.lyricsCandidates, [])
+        assign(\.lyricsChosenID, nil)
+        runLyrics(q, key: s.key, vid: t.videoId, delay: 0)
+    }
+
+    private func runLyrics(_ q: LyricsQuery, key: TabKey, vid: String, delay: Double) {
+        lyricsTask?.cancel()
+        assign(\.lyricsSearching, delay == 0)
+        lyricsTask = Task { [weak self, lyricsService] in
+            if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
+            guard !Task.isCancelled else { return }
+            await MainActor.run { self?.assign(\.lyricsSearching, true) }
+            let outcome = await lyricsService.lookup(q)
+            guard !Task.isCancelled, let self, self.lyricsFor == vid else { return }
+            self.assign(\.lyricsSearching, false)
+            switch outcome {
+            case let .found(cues, chosen, candidates):
+                self.assign(\.lyricsCandidates, candidates)
+                self.assign(\.lyricsChosenID, chosen)
+                self.applyLyrics(cues, key: key, vid: vid)
+            case let .notFound(candidates):
+                self.assign(\.lyricsCandidates, candidates)
+            case .transient:
+                // Offline or LRCLIB busy: try again in 20 s, then 60 s.
+                guard self.lyricsRetries < 2 else { return }
+                let wait = [20.0, 60.0][self.lyricsRetries]
+                self.lyricsRetries += 1
+                self.runLyrics(q, key: key, vid: vid, delay: wait)
+            }
+        }
+    }
+
+    private func applyLyrics(_ cues: [Cue], key: TabKey, vid: String) {
+        let set = CueSet(videoId: vid, source: "lrclib", lang: nil, kind: "lyrics", synced: true, cues: cues)
+        if store.apply(.cues(tab: key.tab, seq: nil, set), conn: key.conn, now: Self.now) { refresh() }
+    }
+
+    /// Shows another LRCLIB version for this song (remembered), or none.
+    func chooseLyrics(_ id: Int?) {
+        guard let s = store.active, let t = s.track, let q = lyricsQuery(t) else { return }
+        let key = s.key, vid = t.videoId
+        lyricsTask?.cancel()
+        assign(\.lyricsSearching, id != nil)
+        lyricsTask = Task { [weak self, lyricsService] in
+            let cues = await lyricsService.choose(id, for: q)
+            guard !Task.isCancelled, let self, self.store.active?.track?.videoId == vid else { return }
+            self.assign(\.lyricsSearching, false)
+            if id != nil, cues == nil { return } // fetch failed: keep what is shown
+            self.assign(\.lyricsChosenID, id)
+            self.applyLyrics(cues ?? [], key: key, vid: vid)
+        }
+    }
+
+    /// Drops the cached result and asks LRCLIB again.
+    func searchLyricsAgain() {
+        guard let t = store.active?.track, let q = lyricsQuery(t) else { return }
+        Task { [weak self, lyricsService] in
+            await lyricsService.forget(q)
+            guard let self else { return }
+            self.lyricsFor = nil
+            self.refresh()
+        }
+    }
+
+    var lyricsAvailable: Bool { store.active?.track.flatMap(lyricsQuery) != nil }
 
     // MARK: Debug (defaults write dev.jiun.subline debugDump -bool true)
 

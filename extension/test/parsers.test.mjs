@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import '../parsers.js';
-const {parseJSON3, normalizeCues, parseLRC} = globalThis.NPParsers;
+const {parseJSON3, normalizeCues} = globalThis.NPParsers;
 
 test('JSON3 converts milliseconds, joins segments and preserves line breaks', () => {
   assert.deepEqual(parseJSON3({events:[{tStartMs:1000,dDurationMs:2500,segs:[{utf8:'Hello '},{utf8:'world\nagain'}]},
@@ -29,15 +29,6 @@ test('normalization sorts, removes invalid rows, merges duplicates and clips ove
   assert.deepEqual(normalizeCues([{s:3,e:5,text:' B '},{s:0,e:4,text:'A'},{s:-1,text:'bad'},
     {s:NaN,text:'bad'},{s:4,e:6,text:'B'},{s:9,text:' '}]),
   [{s:0,e:3,text:'A'},{s:3,e:6,text:'B'}]);
-});
-test('LRC multiple timestamps, fractions, metadata, CRLF and final duration', () => {
-  assert.deepEqual(parseLRC('[ar:Artist]\r\n[00:01.25][00:03.500]Hi\r\n[00:05]Bye',8),
-    [{s:1.25,e:3.5,text:'Hi'},{s:3.5,e:5,text:'Hi'},{s:5,e:8,text:'Bye'}]);
-});
-test('LRC applies millisecond offset, clamps negatives, ignores malformed timestamps', () => {
-  assert.deepEqual(parseLRC('[offset:-500]\n[00:00.20]First\n[00:70]bad\n[00:02:5]Second',5),
-    [{s:0,e:2,text:'First'},{s:2,e:5,text:'Second'}]);
-  assert.deepEqual(parseLRC('plain lyrics without timestamps'), []);
 });
 test('ASR word stream is regrouped into sentences instead of YouTube rolling windows', () => {
   const words = (start, list) => ({tStartMs:start, dDurationMs:9000, wWinId:1,

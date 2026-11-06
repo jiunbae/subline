@@ -108,3 +108,11 @@
 "Plays from this line" = "이 줄부터 재생합니다";
 "Skip Back 10 Seconds" = "10초 뒤로";
 "Skip Forward 10 Seconds" = "10초 앞으로";
+"Lyrics Version" = "가사 버전";
+"Looking for lyrics…" = "가사 찾는 중…";
+"No synced lyrics found" = "시간 맞춤 가사 없음";
+"No Lyrics for This Song" = "이 곡은 가사 숨기기";
+"Search Again" = "다시 찾기";
+"Lyrics from LRCLIB" = "가사 제공: LRCLIB";
+"lrclib" = "LRCLIB";
+"Sync for this song: %+.1fs" = "이 곡 싱크: %+.1f초";

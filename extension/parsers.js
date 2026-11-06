@@ -107,25 +107,5 @@
     }
     return normalizeCues(rows, asr);
   }
-  function parseLRC(text, duration) {
-    if (typeof text !== 'string') return [];
-    const offset = Number(text.match(/\[offset:([+-]?\d+)\]/i)?.[1] ?? 0) / 1000;
-    const cues = [];
-    for (const line of text.split(/\r?\n/)) {
-      const tags = [...line.matchAll(/\[(\d+):(\d{2})(?:[.:](\d{1,3}))?\]/g)];
-      const lyric = clean(line.replace(/\[[^\]]*\]/g, ''));
-      for (const tag of tags) {
-        if (Number(tag[2]) >= 60) continue;
-        const fraction = tag[3] ? Number(tag[3]) / 10 ** tag[3].length : 0;
-        cues.push({s: Math.max(0, Number(tag[1]) * 60 + Number(tag[2]) + fraction + offset), text: lyric});
-      }
-    }
-    const result = normalizeCues(cues);
-    result.forEach((cue, i) => {
-      const end = result[i + 1]?.s ?? duration;
-      if (Number.isFinite(end) && end > cue.s) cue.e = end;
-    });
-    return result;
-  }
-  globalThis.NPParsers = Object.freeze({normalizeCues, parseJSON3, parseLRC});
+  globalThis.NPParsers = Object.freeze({normalizeCues, parseJSON3});
 })();

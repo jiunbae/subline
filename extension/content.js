@@ -3,10 +3,9 @@
   const CHANNEL = 'subline-v1';
   const music = location.hostname === 'music.youtube.com';
   let track = null, main = null, video = null, cues = null, signature = '', captionText = '';
-  let visible = true, buffering = false, tick = null, refreshTimer = null, lyricTimer = null;
+  let visible = true, buffering = false, tick = null, refreshTimer = null;
   let playerObserver = null, barObserver = null, captionObserver = null;
   let observedPlayer = null, observedBar = null, observedCaptions = null;
-  let generation = 0, lyricsAttempt = '', lyricsRetries = 0;
   // Per video: caption tracks chosen in the app (slot 1 = main, 2 = secondary) and the last sent track list.
   let preferredTrack = '', secondaryTrack = '', secondaryCues = null, tracksSig = '';
   const cache = new Map(); // Normalized cues only; no request URLs or credentials.
@@ -95,26 +94,6 @@
       }
     }
   }
-  async function lrclib(id, epoch) {
-    if (!track || track.videoId !== id || track.isAd || !music || cues?.cues?.length) return;
-    const query = {title:track.title, artist:track.artist, album:track.album || '', duration:track.duration};
-    if (!query.title || !query.artist || query.duration <= 0) return;
-    try {
-      const result = await chrome.runtime.sendMessage({op:'lyrics', query});
-      if (epoch !== generation || track?.videoId !== id || track.isAd || cues?.cues?.length) return;
-      // No companion app yet: don't query anyone; try again when the app asks for a snapshot.
-      if (result?.offline) { lyricsAttempt = ''; return; }
-      // Network/server trouble: retry later (20 s, 60 s), then fall back as for "not found".
-      if (result?.transient && lyricsRetries < 2) {
-        const delay = [20000, 60000][lyricsRetries++];
-        clearTimeout(lyricTimer);
-        lyricTimer = setTimeout(() => void lrclib(id, epoch), delay);
-        return;
-      }
-      if (result?.cues?.length) emitCues({type:'cues', videoId:id, source:'lrclib', kind:'lyrics', synced:true, cues:result.cues});
-      // No match: the track simply has no synced lyrics (the empty cue set was already sent).
-    } catch { /* worker unavailable: nothing to show */ }
-  }
   function captionTrackList() {
     const list = !music && track && main?.videoId === track.videoId ? main.data?.captionTracks : null;
     return Array.isArray(list) ? list : null;
@@ -129,14 +108,6 @@
     tracksSig = sig;
     send({type:'captionTracks', videoId:track.videoId, tracks, translations});
   }
-  function beginLyrics() {
-    if (!music || !track || track.isAd || !track.title || !track.artist || track.duration <= 0 || lyricsAttempt === track.videoId) return;
-    lyricsAttempt = track.videoId;
-    // Synced LRCLIB first: YTM web only serves unsynced lyrics (verified 2026-11 while logged in).
-    const id = track.videoId, epoch = generation;
-    clearTimeout(lyricTimer);
-    void lrclib(id, epoch);
-  }
   function refresh() {
     refreshTimer = null;
     attachVideo(); observers();
@@ -145,18 +116,18 @@
     if (next && !next.title && !next.isAd) { askMain('metadata'); return; }
     if (!next) {
       if (track) send({type:'gone'});
-      track = null; cues = null; signature = ''; generation++; clearTimeout(lyricTimer);
+      track = null; cues = null; signature = '';
       askMain('metadata'); return;
     }
     const changed = next.videoId !== track?.videoId;
     const adChanged = next.isAd !== track?.isAd;
     track = next;
     if (changed) {
-      generation++; lyricsAttempt = ''; lyricsRetries = 0; captionText = ''; cues = emptyCues(); preferredTrack = ''; secondaryTrack = ''; secondaryCues = null; tracksSig = '';
+      captionText = ''; cues = emptyCues(); preferredTrack = ''; secondaryTrack = ''; secondaryCues = null; tracksSig = '';
       // Short TTL also avoids persisting changing/live captions across navigation.
       const cached = [...cache.values()].reverse().find(c => c.value.videoId === next.videoId && Date.now() - c.at < 300000);
       if (cached) cues = cached.value;
-      clearTimeout(lyricTimer);
+     
     }
     const newSignature = JSON.stringify(track);
     if (signature !== newSignature) { signature = newSignature; send({type:'track', ...track}); }
@@ -166,7 +137,6 @@
       else { captionText = ''; send({type:'liveCaption', videoId:track.videoId, text:''}); }
     }
     sendCaptionTracks();
-    beginLyrics();
     askMain('metadata');
   }
   function scheduleRefresh() {

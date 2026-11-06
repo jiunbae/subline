@@ -91,31 +91,6 @@ test('native visibility and validated commands route to content script',async()=
   assert.deepEqual(h.sent.map(m=>m.type).sort(),['cmd','visibility']);
   assert.equal(h.sent.find(m=>m.type==='cmd').t,30);
 });
-test('LRCLIB fetch occurs in worker with omitted credentials and caches normalized cues',async()=>{
-  const h=harness(); ready(h);
-  const request={op:'lyrics',query:{title:'Example',artist:'Artist',album:'Album',duration:100}};
-  const sender={id:h.runtime.id,frameId:0,url:'https://music.youtube.com/watch?v=dQw4w9WgXcQ',tab:h.tab};
-  const run=()=>new Promise(resolve=>h.runtime.onMessage.callbacks[0](request,sender,resolve));
-  assert.deepEqual(plain(await run()),{cues:[{s:1,e:100,text:'hello'}]});
-  await run(); assert.equal(h.fetchCount(),1);
-  assert.equal(h.fetches[0].options.credentials,'omit');
-  assert.equal(new URL(h.fetches[0].url).searchParams.get('artist_name'),'Artist');
-  const mismatch={...request,query:{...request.query,duration:110}};
-  const result=await new Promise(resolve=>h.runtime.onMessage.callbacks[0](mismatch,sender,resolve));
-  assert.deepEqual(plain(result),{cues:[]});
-});
-test('LRCLIB retries once with localized/decorative suffixes removed',async()=>{
-  const h=harness(); ready(h);
-  const request={op:'lyrics',query:{title:'Song (Official Audio)',artist:'The Band(더 밴드) - Topic',duration:110}};
-  const sender={id:h.runtime.id,frameId:0,url:'https://music.youtube.com/watch?v=dQw4w9WgXcQ',tab:h.tab};
-  const result=await new Promise(resolve=>h.runtime.onMessage.callbacks[0](request,sender,resolve));
-  assert.deepEqual(plain(result),{cues:[]}); // duration mismatch on both attempts
-  const q=h.fetches.map(f=>new URL(f.url).searchParams);
-  assert.equal(q.length,3); // get, get (cleaned), search
-  assert.equal(new URL(h.fetches[2].url).pathname,'/api/search');
-  assert.equal(q[1].get('track_name'),'Song');
-  assert.equal(q[1].get('artist_name'),'The Band');
-});
 test('caption track lists are sanitized, cached for snapshots, and selection commands validated',async()=>{
   const h=harness(); await flush(); h.publish(track);
   h.publish({type:'captionTracks',videoId:track.videoId,tracks:[
@@ -156,50 +131,15 @@ test('translation targets are forwarded only as x-<lang> translation entries; cu
   h.publish({type:'cues',videoId:track.videoId,source:'yt-captions',lang:'ko',kind:'manual',synced:true,trackId:'bad id',cues:[{s:1,e:2,text:'x'}]});
   assert.equal(h.messages.at(-1).trackId,undefined);
 });
-test('LRCLIB search picks the synced entry with matching title and length when get finds nothing',async()=>{
-  const h=harness(async url=>{
-    if (new URL(url).pathname==='/api/get') return {ok:false,status:404,json:async()=>({})};
-    return {ok:true,json:async()=>[
-      {trackName:'Song (Live)',artistName:'Band',duration:240,syncedLyrics:'[00:01]live'},
-      {trackName:'Song',artistName:'Band',duration:181,instrumental:true,syncedLyrics:'[00:01]inst'},
-      {trackName:'Song',artistName:'Other',duration:182,syncedLyrics:'[00:01]cover'},
-      {trackName:'Song',artistName:'The Band',duration:181,syncedLyrics:'[00:02]right'},
-      {trackName:'Song',artistName:'The Band',duration:183,plainLyrics:'no sync'}]};
-  }); ready(h);
-  const request={op:'lyrics',query:{title:'Song (Official Video)',artist:'The Band',duration:180}};
-  const sender={id:h.runtime.id,frameId:0,url:'https://music.youtube.com/watch?v=dQw4w9WgXcQ',tab:h.tab};
-  const result=await new Promise(resolve=>h.runtime.onMessage.callbacks[0](request,sender,resolve));
-  assert.deepEqual(plain(result).cues.map(c=>c.text),['right']);
-  const search=new URL(h.fetches.at(-1).url);
-  assert.equal(search.searchParams.get('track_name'),'Song');
-  assert.equal(h.fetches.at(-1).options.credentials,'omit');
-});
-test('LRCLIB search requires artist identity and skips empty candidates',async()=>{
-  const run=async list=>{
-    const h=harness(async url=>new URL(url).pathname==='/api/get' ? {ok:false,status:404,json:async()=>({})} : {ok:true,json:async()=>list}); ready(h);
-    const request={op:'lyrics',query:{title:'Song',artist:'The Band',duration:180}};
-    const sender={id:h.runtime.id,frameId:0,url:'https://music.youtube.com/watch?v=dQw4w9WgXcQ',tab:h.tab};
-    return plain(await new Promise(resolve=>h.runtime.onMessage.callbacks[0](request,sender,resolve))).cues.map(c=>c.text);
-  };
-  assert.deepEqual(await run([
-    {trackName:'Song',artistName:'Unrelated Artist',duration:180,syncedLyrics:'[00:01]wrong'},
-    {trackName:'Song (Album version)',artistName:'The Band',duration:180,syncedLyrics:'[00:01]album'}]),['album']);
-  assert.deepEqual(await run([
-    {trackName:'Song',artistName:'The Band',duration:180,syncedLyrics:''},
-    {trackName:'Song',artistName:'The Band',duration:180,syncedLyrics:'no timestamps'},
-    {trackName:'Song',artistName:'The Band',duration:181,syncedLyrics:'[00:03]valid'}]),['valid']);
-  assert.deepEqual(await run([{trackName:'Completely Different',artistName:'The Band',duration:180,syncedLyrics:'[00:01]x'}]),[]);
-});
-test('no external lyric lookup before the companion app has answered, and incognito tabs are ignored',async()=>{
+test('incognito tabs are ignored and the extension never fetches anything itself',async()=>{
   const h=harness();
-  const sender={id:h.runtime.id,frameId:0,url:'https://music.youtube.com/watch?v=dQw4w9WgXcQ',tab:h.tab};
-  const result=await new Promise(resolve=>h.runtime.onMessage.callbacks[0]({op:'lyrics',query:{title:'A',artist:'B',duration:100}},sender,resolve));
-  assert.deepEqual(plain(result),{cues:[],offline:true});
-  assert.equal(h.fetchCount(),0);
+  const sender={id:h.runtime.id,frameId:0,url:'https://www.youtube.com/watch?v=dQw4w9WgXcQ',tab:{...h.tab,incognito:true}};
   const count=h.messages.length;
-  h.runtime.onMessage.callbacks[0]({op:'publish',message:track},{...sender,url:'https://www.youtube.com/watch?v=dQw4w9WgXcQ',tab:{...h.tab,incognito:true}},()=>{});
+  h.runtime.onMessage.callbacks[0]({op:'publish',message:track},sender,()=>{});
   assert.equal(h.messages.length,count);
   assert.equal(JSON.parse(source('manifest.json')).incognito,'not_allowed');
+  for (const f of ['bridge.js','content.js','adapters.js','parsers.js','service-worker.js'])
+    assert.ok(!/\bfetch\(\s*[`'"]https?:/.test(source(f)), `${f} must not make its own network requests`);
 });
 test('reconnect replays tabs in playback-activation order (last started is replayed last)',async()=>{
   const h=harness(); await flush();
@@ -215,20 +155,10 @@ test('reconnect replays tabs in playback-activation order (last started is repla
   const clocks=h.messages.filter(m=>m.type==='clock').slice(-2).map(m=>m.tabId);
   assert.deepEqual(clocks,[7,8]);
 });
-test('transient LRCLIB failures are not cached and are reported as transient',async()=>{
-  let calls=0;
-  const h=harness(async()=>{ calls++; return {ok:false,status:503,json:async()=>({})}; }); ready(h);
-  const request={op:'lyrics',query:{title:'Song',artist:'Band',duration:100}};
-  const sender={id:h.runtime.id,frameId:0,url:'https://music.youtube.com/watch?v=dQw4w9WgXcQ',tab:h.tab};
-  const ask=()=>new Promise(resolve=>h.runtime.onMessage.callbacks[0](request,sender,resolve));
-  assert.deepEqual(plain(await ask()),{cues:[],transient:true});
-  const first=calls;
-  await ask();
-  assert.ok(calls>first,'a transient failure must not be served from the cache');
-});
 test('least privilege: https-only hosts, no cookie or internal-API access in shipped scripts',()=>{
   const m=JSON.parse(source('manifest.json'));
   assert.deepEqual(m.permissions,['nativeMessaging','alarms']);
+  assert.deepEqual(m.host_permissions,['https://www.youtube.com/*','https://music.youtube.com/*']); // lyrics are looked up by the app
   assert.ok([...m.host_permissions,...m.content_scripts.flatMap(c=>c.matches)].every(p=>p.startsWith('https://')));
   for (const f of ['bridge.js','content.js','adapters.js','parsers.js','service-worker.js']) {
     const s=source(f);

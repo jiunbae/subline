@@ -315,7 +315,7 @@ struct TextStatusChip: View {
         switch model.textStatus {
         case .loading:
             // Static glyph, not a ProgressView: a spinning indicator redraws every frame for the whole wait.
-            chip { Label("Loading captions…", systemImage: "ellipsis.bubble") }
+            chip { Label(model.lyricsSearching ? "Looking for lyrics…" : "Loading captions…", systemImage: "ellipsis.bubble") }
         case .available:
             Button { model.connectCaptions() } label: { chip { Label("Load captions", systemImage: "captions.bubble") } }
                 .buttonStyle(.plain)
@@ -526,10 +526,10 @@ struct LyricsList: View {
                                      active: synced && i == activeIndex, synced: synced, fontSize: fontSize)
                                 .equatable()
                                 .id(i)
-                                .onTapGesture { if synced { model.command("seek", t: cues[i].s) } }
+                                .onTapGesture { model.seek(toCue: i) }
                                 .accessibilityAddTraits(synced ? .isButton : [])
                                 .accessibilityHint(synced ? L10n.string("Plays from this line") : "")
-                                .accessibilityAction { if synced { model.command("seek", t: cues[i].s) } }
+                                .accessibilityAction { model.seek(toCue: i) }
                         }
                         Color.clear.frame(height: geo.size.height * 0.55)
                     }

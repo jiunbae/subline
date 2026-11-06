@@ -2,11 +2,10 @@
 importScripts('parsers.js');
 const HOST = 'dev.jiun.subline.host';
 const MATCH = ['https://www.youtube.com/*', 'https://music.youtube.com/*'];
-const states = new Map(), sequences = new Map(), lyricCache = new Map(), inflight = new Map();
+const states = new Map(), sequences = new Map();
 let port = null, retry = null, backoff = 1000, visible = true;
 // True once the native app answered on this connection: external lookups (LRCLIB) only run for a
 // user who actually has the companion app, as the store listing promises.
-let nativeReady = false;
 // A wall-clock epoch prevents sequence regression after an MV3 worker restart;
 // increment separately per tab, and never reset at native reconnect/video change.
 const epoch = Date.now() * 1000;
@@ -25,7 +24,6 @@ function nativeSend(tabId, message) {
   catch { disconnect(); }
 }
 function disconnect() {
-  nativeReady = false;
   const old = port; port = null;
   try { old?.disconnect(); } catch {}
   if (!retry) {
@@ -66,7 +64,6 @@ function connect() {
       if (port !== connection || message?.v !== 1) return;
       // Receiving anything demonstrates a usable round trip.
       backoff = 1000;
-      nativeReady = true;
       if (message.type === 'requestSnapshot') void snapshot();
       else if (message.type === 'visibility' && typeof message.visible === 'boolean') {
         visible = message.visible;
@@ -123,82 +120,9 @@ function sanitize(raw) {
   }
   return null;
 }
-async function lyrics(query) {
-  if (!query || typeof query.title !== 'string' || typeof query.artist !== 'string' ||
-    query.title.length > 1000 || query.artist.length > 1000 || !Number.isFinite(query.duration) || query.duration <= 0) return {cues:[]};
-  const key = JSON.stringify([query.title,query.artist,query.album,query.duration]);
-  const hit = lyricCache.get(key);
-  if (hit && Date.now() - hit.at < 300000) return hit.result;
-  if (inflight.has(key)) return inflight.get(key);
-  const work = (async () => {
-    let result = {cues:[]}, transient = false;
-    // Retry with localized/decorative suffixes removed, e.g. "The Chainsmokers(체인스모커스)",
-    // "Song (Official Audio)", "Artist - Topic".
-    const clean = value => value.replace(/\s*[([（【][^)\]）】]*[)\]）】]/g, '').replace(/\s+-\s+Topic$/i, '').trim();
-    const attempts = [[query.title, query.artist]];
-    const cleaned = [clean(query.title) || query.title, clean(query.artist) || query.artist];
-    if (cleaned[0] !== query.title || cleaned[1] !== query.artist) attempts.push(cleaned);
-    for (const [title, artist] of attempts) {
-      try {
-        const params = new URLSearchParams({track_name:title,artist_name:artist,duration:String(Math.round(query.duration))});
-        if (typeof query.album === 'string' && query.album) params.set('album_name',query.album.slice(0,1000));
-        const response = await fetch(`https://lrclib.net/api/get?${params}`, {signal:AbortSignal.timeout(7000), credentials:'omit'});
-        if (response.status === 429 || response.status >= 500) transient = true;
-        if (response.ok) {
-          const data = await response.json();
-          if (Number.isFinite(data.duration) && Math.abs(data.duration - query.duration) <= 3 && typeof data.syncedLyrics === 'string' && data.syncedLyrics.length < 500000) {
-            result = {cues:NPParsers.parseLRC(data.syncedLyrics, query.duration)};
-          }
-        }
-      } catch { transient = true; /* offline/timeout: never affects playback */ }
-      if (result.cues.length) break;
-    }
-    // Last resort: LRCLIB search (one request). Takes a synced entry within ±3 s of the track's
-    // length, preferring an exact title, then the artist, then the closest length; skips instrumentals.
-    if (!result.cues.length) {
-      try {
-        const [title, artist] = cleaned;
-        const params = new URLSearchParams({track_name:title, artist_name:artist});
-        const response = await fetch(`https://lrclib.net/api/search?${params}`, {signal:AbortSignal.timeout(7000), credentials:'omit'});
-        if (response.status === 429 || response.status >= 500) transient = true;
-        if (response.ok) {
-          const list = await response.json();
-          const norm = value => String(value || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
-          const t = norm(title), a = norm(artist);
-          // Identity is required, not a bonus: compatible artist AND the same title (or one fully containing
-          // the other, e.g. "Song" vs "Song Remastered"); then exact title and closest length rank higher.
-          const artistOK = d => { const n = norm(d.artistName); return !!n && !!a && (n.includes(a) || a.includes(n)); };
-          const titleOK = d => { const n = norm(d.trackName); return !!n && !!t && (n === t || n.includes(t) || t.includes(n)); };
-          const score = d => (norm(d.trackName) === t ? 4 : 0) - Math.abs(d.duration - query.duration) / 3;
-          const candidates = (Array.isArray(list) ? list : []).slice(0, 30)
-            .filter(d => d && !d.instrumental && typeof d.syncedLyrics === 'string' && d.syncedLyrics.trim() &&
-              d.syncedLyrics.length < 500000 && Number.isFinite(d.duration) && Math.abs(d.duration - query.duration) <= 3 &&
-              artistOK(d) && titleOK(d))
-            .sort((x, y) => score(y) - score(x));
-          for (const d of candidates) {                             // first candidate that actually parses
-            const parsed = NPParsers.parseLRC(d.syncedLyrics, query.duration);
-            if (parsed.length) { result = {cues:parsed}; break; }
-          }
-        }
-      } catch { transient = true; }
-    }
-    // Only a definite answer is cached; a network/server failure is retried by the page.
-    if (!result.cues.length && transient) return {cues:[], transient:true};
-    lyricCache.set(key, {at:Date.now(),result});
-    while (lyricCache.size > 24) lyricCache.delete(lyricCache.keys().next().value);
-    return result;
-  })();
-  inflight.set(key, work);
-  try { return await work; } finally { inflight.delete(key); }
-}
 chrome.runtime.onMessage.addListener((request, sender, respond) => {
   if (sender.id !== chrome.runtime.id || sender.frameId !== 0 || !sender.tab || !allowed(sender.url)) return;
   if (sender.tab.incognito) return; // defense in depth: the manifest already disallows incognito
-  if (request?.op === 'lyrics') {
-    if (new URL(sender.url).hostname !== 'music.youtube.com') return;
-    if (!nativeReady) { respond({cues:[], offline:true}); return; } // retried once the app connects
-    lyrics(request.query).then(respond, () => respond({cues:[]})); return true;
-  }
   if (request?.op !== 'publish') return;
   const message = sanitize(request.message);
   if (!message) return;

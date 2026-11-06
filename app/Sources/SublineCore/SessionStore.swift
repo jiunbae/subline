@@ -77,6 +77,9 @@ public struct SessionStore: Sendable {
                     s.secondaryCueSet = set.cues.isEmpty ? nil : set
                     s.secondaryTimeline = set.cues.isEmpty ? .empty : CueTimeline(cues: set.cues, synced: set.synced)
                 } else {
+                    // Lyrics the app found (LRCLIB) outrank the page's empty or unsynced placeholder.
+                    if let cur = s.cueSet, cur.source == "lrclib", cur.videoId == set.videoId, set.source != "lrclib",
+                       !cur.cues.isEmpty, set.cues.isEmpty || !set.synced { return }
                     s.cueSet = set
                     s.timeline = CueTimeline(cues: set.cues, synced: set.synced)
                 }
