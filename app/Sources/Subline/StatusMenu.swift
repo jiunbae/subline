@@ -12,7 +12,11 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     var notch: NotchController?
     /// Show the current line next to the menu bar icon.
     var menuBarLine: Bool = UserDefaults.standard.bool(forKey: "menuBarLine") {
-        didSet { UserDefaults.standard.set(menuBarLine, forKey: "menuBarLine"); updateTitle() }
+        didSet {
+            UserDefaults.standard.set(menuBarLine, forKey: "menuBarLine")
+            model.setLineMirror("menuBar", on: menuBarLine)
+            updateTitle()
+        }
     }
 
     init(model: PlayerModel, panel: PanelController) {
@@ -26,6 +30,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         item.menu = menu
         panel.contextMenuProvider = { [weak self] in self?.makeContextMenu() ?? NSMenu() }
         item.button?.imagePosition = .imageLeading
+        model.setLineMirror("menuBar", on: menuBarLine)
         trackLine()
         model.showCaptionMenu = { [weak self] in
             guard let self else { return }

@@ -319,8 +319,9 @@ import Foundation
     }
 
     @Test func lrcOffsetClampsAndIgnoresMalformed() {
-        let cues = Lyrics.parseLRC("[offset:-500]\n[00:00.20]First\n[00:70]bad\n[00:02:5]Second", duration: 5)
+        let cues = Lyrics.parseLRC("[offset:+500]\n[00:00.20]First\n[00:70]bad\n[00:02:5]Second", duration: 5)
         #expect(cues == [Cue(s: 0, e: 2, text: "First"), Cue(s: 2, e: 5, text: "Second")])
+        #expect(Lyrics.parseLRC("[offset:-250]\n[00:01.00]Late", duration: nil).first?.s == 1.25)
         #expect(Lyrics.parseLRC("plain lyrics without timestamps", duration: nil).isEmpty)
     }
 

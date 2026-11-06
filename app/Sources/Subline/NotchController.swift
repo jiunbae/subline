@@ -9,9 +9,14 @@ final class NotchController {
     private let model: PlayerModel
     private var panel: NSPanel?
     private var observers: [NSObjectProtocol] = []
+    private var fadingOut = false
 
     var enabled: Bool = UserDefaults.standard.bool(forKey: "notchLine") {
-        didSet { UserDefaults.standard.set(enabled, forKey: "notchLine"); update() }
+        didSet {
+            UserDefaults.standard.set(enabled, forKey: "notchLine")
+            model.setLineMirror("notch", on: enabled)
+            update()
+        }
     }
 
     init(model: PlayerModel) {
@@ -19,6 +24,7 @@ final class NotchController {
         observers.append(NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
         ) { [weak self] _ in MainActor.assumeIsolated { self?.place() } })
+        model.setLineMirror("notch", on: enabled)
         track()
     }
 
@@ -36,16 +42,22 @@ final class NotchController {
 
     private func update() {
         guard wanted else {
-            if let p = panel, p.isVisible {
-                NSAnimationContext.runAnimationGroup({ $0.duration = 0.25; p.animator().alphaValue = 0 }) { p.orderOut(nil) }
+            if let p = panel, p.isVisible, !fadingOut {
+                fadingOut = true
+                NSAnimationContext.runAnimationGroup({ $0.duration = 0.25; p.animator().alphaValue = 0 }) { [weak self] in
+                    MainActor.assumeIsolated {
+                        guard let self else { return }
+                        self.fadingOut = false
+                        // Wanted again during the fade: stay up.
+                        if self.wanted { self.update() } else { p.orderOut(nil) }
+                    }
+                }
             }
             return
         }
         let p = panel ?? makePanel()
-        if !p.isVisible {
-            place()
-            p.alphaValue = 0
-            p.orderFrontRegardless()
+        if !p.isVisible { place(); p.alphaValue = 0; p.orderFrontRegardless() }
+        if p.alphaValue < 1, !fadingOut {
             NSAnimationContext.runAnimationGroup { $0.duration = 0.25; p.animator().alphaValue = 1 }
         }
     }

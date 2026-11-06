@@ -143,7 +143,7 @@ final class PlayerModel {
             guard let k = offsetKey, !loadingOffset else { return }
             var all = UserDefaults.standard.dictionary(forKey: "syncOffsets") as? [String: Double] ?? [:]
             all[k] = abs(captionOffset) < 0.001 ? nil : captionOffset
-            if all.count > 500 { all = Dictionary(uniqueKeysWithValues: all.prefix(400).map { ($0.key, $0.value) }) }
+            if all.count > 500 { for key in all.keys.filter({ $0 != k }).prefix(all.count - 400) { all[key] = nil } }
             UserDefaults.standard.set(all, forKey: "syncOffsets")
         }
     }
@@ -187,7 +187,7 @@ final class PlayerModel {
     @ObservationIgnored private var secondarySent: [String: CaptionRequest] = [:]
     @ObservationIgnored private var secondaryMappedFor: [Cue] = []
     @ObservationIgnored private var timer: DispatchSourceTimer?
-    @ObservationIgnored private var panelVisible = false // the panel starts hidden; the first show is a real change
+    @ObservationIgnored private var panelVisible = false // the panel starts hidden
     @ObservationIgnored private var artworkKey: String?
     @ObservationIgnored private var artworkFailedAt: [String: Double] = [:]
     @ObservationIgnored private var currentVideo: String?
@@ -307,6 +307,7 @@ final class PlayerModel {
     func selectSecondary(_ id: String?, remember: Bool = true) {
         guard let k = store.activeKey, let vid = store.active?.track?.videoId else { return }
         if let id, id == captionTrackID { return } // the main track can't also be the sub
+        derivedTask?.cancel(); derivedSig = nil
         if DerivedLines.isDerived(id) || (id == nil && DerivedLines.isDerived(secondaryTrackID)) {
             // Made on this Mac: stop any YouTube sub track, then (re)build from the main text.
             if remember { preferredSecondaryID = id }
@@ -368,10 +369,24 @@ final class PlayerModel {
     }
 
     func setVisible(_ visible: Bool) {
-        // Broadcast only real changes: every visibility message makes each tab answer with a clock.
-        guard visible != panelVisible else { return }
         panelVisible = visible
-        send?(.visibility(visible), nil)
+        updateVisibility()
+    }
+
+    /// Menu bar / notch lines that need the current line even while the overlay is hidden.
+    @ObservationIgnored private var lineMirrors: Set<String> = []
+    func setLineMirror(_ name: String, on: Bool) {
+        if on { lineMirrors.insert(name) } else { lineMirrors.remove(name) }
+        updateVisibility()
+    }
+    private var showingText: Bool { panelVisible || !lineMirrors.isEmpty }
+    @ObservationIgnored private var sentVisible = false
+
+    private func updateVisibility() {
+        // Broadcast only real changes: every visibility message makes each tab answer with a clock.
+        guard showingText != sentVisible else { reschedule(); return }
+        sentVisible = showingText
+        send?(.visibility(showingText), nil)
         reschedule()
     }
 
@@ -410,6 +425,11 @@ final class PlayerModel {
             loadingOffset = true
             if captionOffset != saved { captionOffset = saved }
             loadingOffset = false
+            // Nothing from the previous song's lookups may land on this one.
+            lyricsTask?.cancel(); lyricsTask = nil; lyricsFor = nil; lyricsRetries = 0
+            assign(\.lyricsCandidates, []); assign(\.lyricsChosenID, nil); assign(\.lyricsSearching, false)
+            derivedTask?.cancel(); derivedTask = nil; derivedSig = nil; pendingDownload = nil
+            assign(\.derivedNote, nil)
         }
         assign(\.hasTrack, true)
         assign(\.title, t.title)
@@ -423,7 +443,7 @@ final class PlayerModel {
         let cueSet = (s.cueSet?.videoId == t.videoId && !(t.isAd ?? false)) ? s.cueSet : nil
         // Timeline cues are pre-sorted and share storage across ticks, so == hits the identity fast path.
         assign(\.cues, cueSet == nil ? [] : s.timeline.cues)
-        let sub = (s.secondaryCueSet?.videoId == t.videoId && !(t.isAd ?? false) && cueSet != nil) ? s.secondaryCueSet : nil
+        let sub = (s.secondaryCueSet?.videoId == t.videoId && !(t.isAd ?? false) && cueSet != nil && !s.timeline.cues.isEmpty) ? s.secondaryCueSet : nil
         let subCues = sub == nil ? [] : s.secondaryTimeline.cues
         // Rebuild when either track's content changes (not just the row count: a different main track
         // with the same number of lines must not keep the old mapping). Equal arrays share storage, so
@@ -480,6 +500,7 @@ final class PlayerModel {
         derivedTask = Task { [weak self] in
             var out: [Cue] = []
             var note: String?
+            var download: (String, String)?
             if pref == DerivedLines.romajiID {
                 out = await Task.detached(priority: .utility) { DerivedLines.romanized(source, lang: lang) }.value
                 if out.isEmpty { note = L10n.string("Nothing to romanize in this text") }
@@ -488,13 +509,14 @@ final class PlayerModel {
                 case let .cues(c): out = c
                 case let .needsDownload(from, to):
                     note = L10n.format("Download %@ → %@ for translation…", DerivedLines.name(from), DerivedLines.name(to))
-                    self?.pendingDownload = (from, to)
+                    download = (from, to)
                 case .sameLanguage: note = L10n.string("Already in your language")
                 case .unavailable: note = L10n.string("Translation isn't available for this language")
                 }
             }
             guard !Task.isCancelled, let self, self.store.active?.track?.videoId == vid, self.derivedSig == sig else { return }
             self.assign(\.derivedNote, note)
+            self.pendingDownload = download
             var set = CueSet(videoId: vid, source: pref == DerivedLines.romajiID ? "romanized" : "apple-translate",
                              lang: pref == DerivedLines.romajiID ? nil : DerivedLines.targetCode(for: lang), kind: "manual", synced: true, cues: out, slot: 2)
             set.trackId = pref
@@ -770,7 +792,7 @@ final class PlayerModel {
             assign(\.upcomingIndex, nil)
             return
         }
-        guard panelVisible else { return } // nothing to draw; resume on show
+        guard showingText else { return } // nothing to draw; resume on show
         let now = Self.now
         let position = clock.position(at: now)
         let mediaT = position - captionOffset

@@ -92,7 +92,8 @@ public enum Lyrics {
                     let f = ns.substring(with: m.range(at: 3))
                     frac = (Double(f) ?? 0) / pow(10, Double(f.count))
                 }
-                cues.append(Cue(s: max(0, min * 60 + sec + frac + offset), text: lyric))
+                // [offset:+n] means the lyrics come n ms sooner.
+                cues.append(Cue(s: max(0, min * 60 + sec + frac - offset), text: lyric))
             }
         }
         cues.sort { $0.s < $1.s }

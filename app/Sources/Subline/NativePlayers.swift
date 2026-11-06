@@ -27,6 +27,8 @@ final class NativePlayers {
     }
     /// The user declined Automation access for an app: we still follow its notifications.
     private(set) var denied: Set<App> = []
+    private var lastDeniedCheck: [App: Date] = [:]
+    private var artworkTries: [String: Int] = [:]
 
     private struct Snapshot: Equatable {
         var id: String, title: String, artist: String, album: String?, duration: Double?, artwork: String?
@@ -70,11 +72,16 @@ final class NativePlayers {
         case "seek": guard let t else { return }; verb = "set player position to \(String(format: "%.2f", t))"
         default: return
         }
-        scripts.run("tell application id \"\(app.bundleID)\" to \(verb)") { [weak self] _, err in
+        scripts.run(Self.ifRunning(app, verb)) { [weak self] _, err in
             if let err { NSLog("Subline: %@ command failed (%d)", app.site, err) }
             // Position changes don't always post a notification: read the state back.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { self?.query(app) }
         }
+    }
+
+    /// Wraps a command so that it never launches the app (it may quit while the script is queued).
+    private static func ifRunning(_ app: App, _ body: String) -> String {
+        "if application id \"\(app.bundleID)\" is running then\ntell application id \"\(app.bundleID)\"\n\(body)\nend tell\nend if"
     }
 
     // MARK: State
@@ -84,6 +91,11 @@ final class NativePlayers {
         let state = (info["Player State"] as? String ?? "").lowercased()
         if state == "stopped" { clear(app); return }
         // The notification carries most fields; AppleScript adds position (Music) and artwork.
+        // Access may have been granted in System Settings since: try again now and then.
+        if denied.contains(app), Date().timeIntervalSince(lastDeniedCheck[app] ?? .distantPast) > 60 {
+            lastDeniedCheck[app] = Date()
+            denied.remove(app)
+        }
         if denied.contains(app) {
             let ms = (info["Duration"] as? Double) ?? (info["Total Time"] as? Double)
             let id = (info["Track ID"] as? String) ?? (info["PersistentID"].map { "\($0)" }) ?? (info["Name"] as? String ?? "")
@@ -101,32 +113,29 @@ final class NativePlayers {
         let src: String
         switch app {
         case .spotify:
-            src = """
-            tell application id "com.spotify.client"
+            src = Self.ifRunning(app, """
               set s to player state as string
               if s is "stopped" then return {s}
               set t to current track
               return {s, player position, id of t, name of t, artist of t, album of t, (duration of t) / 1000, artwork url of t}
-            end tell
-            """
+            """)
         case .music:
-            src = """
-            tell application id "com.apple.Music"
+            src = Self.ifRunning(app, """
               set s to player state as string
               if s is "stopped" then return {s}
               set t to current track
               return {s, player position, persistent ID of t, name of t, artist of t, album of t, duration of t, ""}
-            end tell
-            """
+            """)
         }
         scripts.run(src) { [weak self] d, err in
             MainActor.assumeIsolated {
                 guard let self else { return }
                 if let err {
-                    if err == -1743 { self.denied.insert(app) } // Automation access declined
+                    if err == -1743 { self.denied.insert(app); self.lastDeniedCheck[app] = Date() } // Automation access declined
                     return
                 }
-                guard let d else { return }
+                // Turned off, or the app quit, while the script was queued: don't bring it back.
+                guard self.enabled, app.isRunning, let d else { return }
                 let s = (d.atIndex(1)?.stringValue ?? "").lowercased()
                 guard s != "stopped", d.numberOfItems >= 8 else { self.clear(app); return }
                 let id = d.atIndex(3)?.stringValue ?? ""
@@ -137,7 +146,12 @@ final class NativePlayers {
                                     artwork: art ?? (prev?.id == id ? prev?.artwork : nil),
                                     position: d.atIndex(2)?.doubleValue ?? 0, playing: s == "playing")
                 self.publish(app, snap)
-                if app == .music, prev?.id != id { self.loadMusicArtwork(id) }
+                // Again on later queries if the first try found nothing (e.g. Music was still launching).
+                if app == .music, snap.artwork == nil, self.artworkTries[id, default: 0] < 3 {
+                    self.artworkTries[id, default: 0] += 1
+                    if self.artworkTries.count > 50 { self.artworkTries = [id: self.artworkTries[id]!] }
+                    self.loadMusicArtwork(id)
+                }
             }
         }
     }
@@ -148,18 +162,24 @@ final class NativePlayers {
         guard !safe.isEmpty else { return }
         let file = Self.artworkDir.appendingPathComponent(safe + ".img")
         if FileManager.default.fileExists(atPath: file.path) { setArtwork(.music, id: id, url: file.absoluteString); return }
-        scripts.run("tell application id \"com.apple.Music\" to get raw data of artwork 1 of current track") { [weak self] d, _ in
-            guard let data = d?.data, data.count > 64, data.count < 8_000_000 else { return }
+        let script = Self.ifRunning(.music, """
+          set t to current track
+          return {persistent ID of t, raw data of artwork 1 of t}
+        """)
+        // Disk work stays on the script queue; only the result goes to the main thread.
+        scripts.runInBackground(script) { [weak self] d, _ in
+            // The current track may have changed while the script was queued: only keep a match.
+            guard let d, d.numberOfItems >= 2, d.atIndex(1)?.stringValue == id,
+                  let data = d.atIndex(2)?.data, data.count > 64, data.count < 8_000_000 else { return }
             let fm = FileManager.default
             try? fm.createDirectory(at: Self.artworkDir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
             // Keep the folder small: the last 20 covers.
             if let files = try? fm.contentsOfDirectory(at: Self.artworkDir, includingPropertiesForKeys: [.contentModificationDateKey]), files.count > 20 {
-                let old = files.sorted { (try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate ?? .distantPast) ?? .distantPast
-                    < (try? $1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate ?? .distantPast) ?? .distantPast }
-                old.prefix(files.count - 20).forEach { try? fm.removeItem(at: $0) }
+                let dated = files.map { ($0, (try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast) }
+                dated.sorted { $0.1 < $1.1 }.prefix(files.count - 20).forEach { try? fm.removeItem(at: $0.0) }
             }
             guard (try? data.write(to: file, options: .atomic)) != nil else { return }
-            MainActor.assumeIsolated { self?.setArtwork(.music, id: id, url: file.absoluteString) }
+            DispatchQueue.main.async { MainActor.assumeIsolated { self?.setArtwork(.music, id: id, url: file.absoluteString) } }
         }
     }
 
@@ -214,6 +234,14 @@ final class ScriptRunner: @unchecked Sendable {
     private var compiled: [String: NSAppleScript] = [:]
 
     func run(_ source: String, completion: @escaping @Sendable (NSAppleEventDescriptor?, Int?) -> Void) {
+        runInBackground(source) { d, code in
+            nonisolated(unsafe) let result = d // handed over once; only read on the main thread
+            DispatchQueue.main.async { completion(result, code) }
+        }
+    }
+
+    /// Like `run`, but calls `work` on the script queue (for follow-up disk work).
+    func runInBackground(_ source: String, work: @escaping @Sendable (NSAppleEventDescriptor?, Int?) -> Void) {
         queue.async { [self] in
             let script = compiled[source] ?? {
                 let s = NSAppleScript(source: source)!
@@ -224,7 +252,7 @@ final class ScriptRunner: @unchecked Sendable {
             var error: NSDictionary?
             let result = script.executeAndReturnError(&error)
             let code = (error?[NSAppleScript.errorNumber] as? Int)
-            DispatchQueue.main.async { completion(error == nil ? result : nil, code) }
+            work(error == nil ? result : nil, code)
         }
     }
 }
