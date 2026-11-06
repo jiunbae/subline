@@ -130,7 +130,15 @@ actor LyricsService {
     }
 
     /// Forgets the cached result (and choice) so the next lookup asks LRCLIB again.
+    /// The user's imported file is kept (it isn't something LRCLIB can give back).
     func forget(_ q: LyricsQuery) {
+        if let imported = entry(q.cacheKey)?.imported {
+            // An expired, empty result: the next lookup asks LRCLIB again and keeps the import.
+            var e = Entry(chosen: nil, lrc: nil, candidates: [], at: .distantPast)
+            e.imported = imported
+            save(q.cacheKey, e)
+            return
+        }
         memory[q.cacheKey] = nil
         try? FileManager.default.removeItem(at: file(q.cacheKey))
     }
