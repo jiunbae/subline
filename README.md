@@ -98,12 +98,29 @@ Playback stays in your browser. The app only receives metadata, the clock and ca
 scripts/build-app.sh --install     # universal build → ~/Applications, then launches it
 ```
 
-1. A ♪ appears in the menu bar and a **setup window** walks you through adding the extension.
-2. Reload your YouTube tabs and press play. The overlay appears on its own.
+A ♪ appears in the menu bar and a **setup window** opens. Then, depending on where you listen:
+
+| You listen on | Do this |
+|---|---|
+| **YouTube / YouTube Music** in Chrome, Arc, Brave, Edge or Vivaldi | Add the extension from the setup window, reload your YouTube tabs, press play |
+| **Spotify or Apple Music** | Nothing to install. Press play; the first time, macOS asks whether Subline may see what's playing, click **OK** |
+
+The overlay appears on its own when playback starts.
 
 > [!TIP]
 > Opening the app again (Finder or Spotlight) while it runs brings the setup window back as a status page,
-> with troubleshooting for browsers that can't reach it.
+> with troubleshooting and **Permissions & optional downloads**.
+
+### Permissions and downloads
+
+Everything below is optional except the extension (for YouTube) and Automation (for Spotify/Music).
+
+| What | When it's asked for | Why | Without it |
+|---|---|---|---|
+| Browser extension | Setup, for YouTube / YouTube Music | Reads the player's state and captions | No YouTube in the overlay (Spotify/Music still work) |
+| **Automation** (Spotify, Music) | Once, the first time Spotify or Music plays | Read the song, exact position and artwork; send play/pause, next, seek | The song still shows (from the apps' notifications), but without the exact position, Music artwork or controls. Allow later in System Settings › Privacy & Security › Automation |
+| **Translation languages** | Only when you choose Second Language › Translate on This Mac (macOS 26) | Apple's on-device translation of lyrics into your language; a one-time download per language (a few hundred MB) | Nothing else changes. YouTube's own auto-translated captions and romanization need no download |
+| Network: lrclib.net | Automatically, for YouTube Music / Spotify / Music songs | Find synced lyrics (title, artist, album, length are sent); cached on this Mac | Disconnected: songs heard before still have lyrics; new ones show the title only |
 
 <details>
 <summary><b>What setup does, in detail</b></summary>

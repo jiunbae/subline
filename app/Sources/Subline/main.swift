@@ -77,14 +77,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.openAppearance = { [weak self] in self?.appearance.show() }
         model.onPresence = { [weak self] hasTrack, playing, videoId in
             self?.panel.presence(hasTrack: hasTrack, playing: playing, videoId: videoId)
+            if hasTrack, !UserDefaults.standard.bool(forKey: "everConnected") { UserDefaults.standard.set(true, forKey: "everConnected") }
         }
         panel.start()
         native.start()
         if CommandLine.arguments.contains("--appearance") { appearance.show() }
+        if CommandLine.arguments.contains("--setup-demo") { setup.show() }
         // First run (no extension has ever connected): show the setup checklist instead of an empty overlay.
         if !UserDefaults.standard.bool(forKey: "everConnected") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-                guard let self, self.model.connectionCount == 0 else { return }
+                // Spotify/Music listeners need no extension: something already playing counts as set up.
+                guard let self, self.model.connectionCount == 0, !self.model.hasTrack else { return }
                 self.setup.show()
             }
         }

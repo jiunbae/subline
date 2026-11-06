@@ -159,7 +159,13 @@ final class PlayerModel {
     @ObservationIgnored private(set) var store = SessionStore()
     @ObservationIgnored var send: ((Outgoing, Int?) -> Void)?
     /// Spotify / Apple Music source (menu toggle).
-    @ObservationIgnored var native: NativePlayers?
+    @ObservationIgnored var native: NativePlayers? {
+        didSet { native?.onDeniedChange = { [weak self] d in self?.assign(\.automationDenied, d) } }
+    }
+    /// macOS Automation access to Spotify/Music was declined (setup window explains how to allow it).
+    private(set) var automationDenied = false
+    /// What's shown comes from the Spotify or Music app (no browser extension involved).
+    var playingFromNativeApp: Bool { hasTrack && (site == "spotify" || site == "music") }
     /// Fired after every state projection: (hasTrack, isPlaying, videoId). Drives overlay auto show/hide.
     @ObservationIgnored var onPresence: ((Bool, Bool, String?) -> Void)?
     /// Opens the setup window (wired by the app delegate).

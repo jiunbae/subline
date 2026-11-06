@@ -26,7 +26,9 @@ final class NativePlayers {
         }
     }
     /// The user declined Automation access for an app: we still follow its notifications.
-    private(set) var denied: Set<App> = []
+    private(set) var denied: Set<App> = [] { didSet { if denied.isEmpty != oldValue.isEmpty { onDeniedChange?(!denied.isEmpty) } } }
+    /// Tells the model (observable) when Automation access is declined / granted again.
+    var onDeniedChange: ((Bool) -> Void)?
     private var lastDeniedCheck: [App: Date] = [:]
     private var artworkTries: [String: Int] = [:]
 

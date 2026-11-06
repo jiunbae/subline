@@ -2,8 +2,9 @@ import AppKit
 import SwiftUI
 import SublineCore
 
-/// First-run checklist: install the Chrome extension, then play something. Each step turns green on
-/// its own (extension connects → step 1, a track arrives → step 2) and the window closes when done.
+/// First-run checklist: connect a source (browser extension, or Spotify/Music which need nothing),
+/// then play something. Each step turns green on its own and the window closes when done. Also lists
+/// the permissions and optional downloads and when each is needed.
 @MainActor
 final class SetupWindowController: NSObject, NSWindowDelegate {
     private let model: PlayerModel
@@ -71,11 +72,17 @@ private struct SetupView: View {
     let model: PlayerModel
     let close: () -> Void
     @State private var showDev = false
+    @State private var showExtras = SetupView.demo
 
+    /// `--setup-demo`: every step open and the extras expanded (screenshots, layout checks).
+    private static let demo = CommandLine.arguments.contains("--setup-demo")
     private var extensionDone: Bool { model.connectionCount > 0 }
+    /// Step 1 is done by either path: the browser extension connected, or Spotify/Music is playing.
+    private var sourceDone: Bool { !Self.demo && (extensionDone || model.playingFromNativeApp) }
     private var playDone: Bool { model.hasTrack }
-    private var hasChrome: Bool { SetupWindowController.chromeApp != nil }
+    private var hasBrowser: Bool { !Diagnostics.shared.registrations.isEmpty || SetupWindowController.chromeApp != nil }
     private var store: URL? { SetupWindowController.storeURL }
+    private static func installed(_ id: String) -> Bool { NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) != nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -84,20 +91,23 @@ private struct SetupView: View {
                     .resizable().frame(width: 52, height: 52)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Subline").font(.system(size: 20, weight: .bold))
-                    Text("Floating artwork and synced lyrics for YouTube and YouTube Music.")
+                    Text("Floating artwork and synced lyrics for YouTube, YouTube Music, Spotify and Apple Music.")
                         .font(.system(size: 12)).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .padding(.top, 8)
 
             VStack(alignment: .leading, spacing: 14) {
-                StepRow(number: 1, title: "Add the Chrome extension", done: extensionDone, current: !extensionDone) {
-                    extensionStep
+                StepRow(number: 1, title: "Connect where you listen", done: sourceDone, current: !sourceDone) {
+                    sourceStep
                 }
-                StepRow(number: 2, title: "Play something on YouTube", done: playDone, current: extensionDone && !playDone) {
+                StepRow(number: 2, title: "Play something", done: playDone, current: sourceDone && !playDone) {
                     HStack(spacing: 8) {
                         Button("Open YouTube Music") { SetupWindowController.openInChrome(URL(string: "https://music.youtube.com")!) }
                         Button("Open YouTube") { SetupWindowController.openInChrome(URL(string: "https://www.youtube.com")!) }
+                        if Self.installed("com.spotify.client") { Button("Open Spotify") { Self.launch("com.spotify.client") } }
+                        if Self.installed("com.apple.Music") { Button("Open Music") { Self.launch("com.apple.Music") } }
                     }
                     .controlSize(.small)
                     Text("The overlay appears when playback starts and fades away when you stop.")
@@ -105,9 +115,16 @@ private struct SetupView: View {
                 }
             }
 
-            if !extensionDone || Diagnostics.shared.hasProblem { TroubleshootingView(diagnostics: Diagnostics.shared) }
+            if !sourceDone || Diagnostics.shared.hasProblem { TroubleshootingView(diagnostics: Diagnostics.shared) }
 
-            if extensionDone && playDone {
+            DisclosureGroup(isExpanded: Binding(get: { showExtras || model.automationDenied }, set: { showExtras = $0 })) {
+                ExtrasView(model: model).padding(.top, 6)
+            } label: {
+                Label("Permissions & optional downloads", systemImage: "slider.horizontal.3")
+                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+            }
+
+            if sourceDone && playDone {
                 Label("You're all set.", systemImage: "checkmark.seal.fill")
                     .font(.system(size: 13, weight: .semibold)).foregroundStyle(.green)
             }
@@ -115,26 +132,49 @@ private struct SetupView: View {
                 Text("⌃⌥⌘O show/hide  ·  ⌃⌥⌘L click-through  ·  ⌃⌥⌘Space play/pause")
                     .font(.system(size: 10.5)).foregroundStyle(.tertiary)
                 Spacer()
-                Button(L10n.string(extensionDone && playDone ? "Done" : "Later")) { close() }
+                Button(L10n.string(sourceDone && playDone ? "Done" : "Later")) { close() }
                     .keyboardShortcut(.defaultAction)
             }
         }
         .padding(24)
-        .frame(width: 460)
+        .frame(width: 480)
         .fixedSize(horizontal: false, vertical: true)
-        .onChange(of: extensionDone && playDone) { _, done in
-            if done { DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { close() } }
+        .onChange(of: sourceDone && playDone) { _, done in
+            // Leave it open while the extras are being read.
+            if done, !showExtras { DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { if !showExtras { close() } } }
+        }
+    }
+
+    private static func launch(_ id: String) {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) else { return }
+        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+    }
+
+    @ViewBuilder private var sourceStep: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 6) {
+                Label("YouTube and YouTube Music in your browser", systemImage: "globe")
+                    .font(.system(size: 12, weight: .semibold))
+                extensionStep
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Label("Spotify or Apple Music", systemImage: "music.note")
+                    .font(.system(size: 12, weight: .semibold))
+                Text("Nothing to install: just play a song. The first time, macOS asks to let Subline see what's playing; click OK.")
+                    .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
     @ViewBuilder private var extensionStep: some View {
-        if !hasChrome {
-            Text("Google Chrome is required.").font(.system(size: 12))
+        if !hasBrowser {
+            Text("Needs Google Chrome or another Chromium browser (Arc, Brave, Edge, Vivaldi).").font(.system(size: 11))
+                .fixedSize(horizontal: false, vertical: true)
             Button("Get Google Chrome") { NSWorkspace.shared.open(URL(string: "https://www.google.com/chrome/")!) }
                 .controlSize(.small)
         } else if let store {
             Button("Add to Chrome") { SetupWindowController.openInChrome(store) }
-                .buttonStyle(.borderedProminent).controlSize(.regular)
+                .buttonStyle(.borderedProminent).controlSize(.small)
             Text("If Chrome shows “New extension added”, click Enable extension.")
                 .font(.system(size: 11)).foregroundStyle(.secondary)
             DisclosureGroup("Developer install", isExpanded: $showDev) { devInstall }
@@ -153,6 +193,53 @@ private struct SetupView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.top, 2)
+    }
+}
+
+/// What may be asked for or downloaded, when, and what happens without it.
+private struct ExtrasView: View {
+    let model: PlayerModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            item("hand.raised", "Automation (Spotify, Music)",
+                 model.automationDenied
+                    ? "Declined: Subline still shows the song from Spotify/Music notifications, but without the exact position, artwork from Music, or controls."
+                    : "macOS asks once, when Spotify or Music first plays. It lets Subline read the song, position and artwork and send play/pause.",
+                 warn: model.automationDenied) {
+                Button("Open Automation Settings") {
+                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")!)
+                }
+            }
+            item("character.bubble", "Translation languages (optional)",
+                 "Only for Second Language › Translate on This Mac (lyrics in another language). YouTube's own auto-translation and romanization need nothing. macOS downloads a language once (a few hundred MB); translation then stays on this Mac.",
+                 warn: false) {
+                if model.pendingDownload != nil {
+                    Button("Download Now…") { model.downloadTranslationLanguages() }
+                }
+                Button("Language & Region Settings") {
+                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Localization-Settings.extension")!)
+                }
+            }
+            item("menubar.rectangle", "Menu bar and notch",
+                 "Show the current line next to the menu bar icon or under the notch: menu › Also Show Current Line.",
+                 warn: false) { EmptyView() }
+            item("network", "Lyrics lookups",
+                 "For YouTube Music, Spotify and Music, the app asks lrclib.net (title, artist, album, length) and keeps the result on this Mac. The extension itself sends nothing anywhere.",
+                 warn: false) { EmptyView() }
+        }
+    }
+
+    private func item<B: View>(_ icon: String, _ title: String, _ text: String, warn: Bool, @ViewBuilder buttons: () -> B) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: warn ? "exclamationmark.triangle.fill" : icon)
+                .foregroundStyle(warn ? Color.orange : Color.secondary).frame(width: 18)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(L10n.string(title)).font(.system(size: 12, weight: .semibold))
+                Text(L10n.string(text)).font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 8) { buttons() }.controlSize(.small)
+            }
+        }
     }
 }
 
