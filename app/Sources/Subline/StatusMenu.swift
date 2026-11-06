@@ -1,4 +1,5 @@
 import AppKit
+import UniformTypeIdentifiers
 import Observation
 import SublineCore
 
@@ -363,7 +364,15 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
             i.state = model.lyricsChosenID == c.id && model.cueSource == "lrclib" ? .on : .off
             m.addItem(i)
         }
+        if model.lyricsChosenID == LyricsService.importedID {
+            let imp = NSMenuItem(title: L10n.string("Imported LRC File"), action: nil, keyEquivalent: "")
+            imp.state = .on; imp.isEnabled = false
+            m.addItem(imp)
+        }
         m.addItem(.separator())
+        let importItem = NSMenuItem(title: L10n.string("Import LRC File…"), action: #selector(importLRC), keyEquivalent: "")
+        importItem.target = self
+        m.addItem(importItem)
         let hide = NSMenuItem(title: L10n.string("No Lyrics for This Song"), action: #selector(pickLyrics(_:)), keyEquivalent: "")
         hide.target = self; hide.representedObject = -1
         hide.isEnabled = model.cueSource == "lrclib" && !model.cues.isEmpty
@@ -383,6 +392,27 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         model.chooseLyrics(id < 0 ? nil : id)
     }
     @objc private func searchLyricsAgain() { model.searchLyricsAgain() }
+
+    @objc private func importLRC() {
+        let panel = NSOpenPanel()
+        panel.title = L10n.string("Import LRC File…")
+        panel.message = L10n.format("Synced lyrics for “%@”", model.title)
+        panel.allowedContentTypes = [UTType(filenameExtension: "lrc") ?? .plainText, .plainText]
+        panel.allowsMultipleSelection = false
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK, let url = panel.url,
+              let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize, size < 1_000_000,
+              let data = try? Data(contentsOf: url),
+              let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) else { return }
+        Task { @MainActor in
+            if await !model.importLyrics(text) {
+                let a = NSAlert()
+                a.messageText = L10n.string("No timed lines in this file")
+                a.informativeText = L10n.string("An LRC file has lines like “[01:23.45] lyrics”.")
+                a.runModal()
+            }
+        }
+    }
 
     @objc private func resumeRecent(_ s: NSMenuItem) {
         if let id = s.representedObject as? String, let r = model.recents.first(where: { $0.videoId == id }) { model.resume(r) }

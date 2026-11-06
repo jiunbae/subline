@@ -155,3 +155,8 @@
 "Show the current line next to the menu bar icon or under the notch: menu › Also Show Current Line." = "현재 줄을 메뉴 막대 아이콘 옆이나 노치 아래에 표시: 메뉴 › 현재 줄 함께 표시.";
 "Lyrics lookups" = "가사 찾기";
 "For YouTube Music, Spotify and Music, the app asks lrclib.net (title, artist, album, length) and keeps the result on this Mac. The extension itself sends nothing anywhere." = "YouTube Music, Spotify, 음악 앱의 곡은 앱이 lrclib.net에 곡 제목·아티스트·앨범·길이로 가사를 찾고, 결과를 이 Mac에 저장합니다. 확장은 아무 데도 데이터를 보내지 않습니다.";
+"Imported LRC File" = "가져온 LRC 파일";
+"Import LRC File…" = "LRC 파일 가져오기…";
+"Synced lyrics for “%@”" = "“%@”의 시간 맞춤 가사";
+"No timed lines in this file" = "이 파일에는 시간이 붙은 줄이 없습니다";
+"An LRC file has lines like “[01:23.45] lyrics”." = "LRC 파일은 “[01:23.45] 가사” 같은 줄로 되어 있습니다.";

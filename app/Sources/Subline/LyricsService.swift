@@ -32,6 +32,7 @@ actor LyricsService {
     private var memory: [String: Entry] = [:]
     private static let negativeTTL: TimeInterval = 24 * 3600
     private static let maxFiles = 800
+    private static let maxSearchBytes = 4_000_000
 
     private var dir: URL { SublinePaths.supportDir.appendingPathComponent("lyrics", isDirectory: true) }
 
@@ -82,11 +83,29 @@ actor LyricsService {
         guard let id else {
             e.hidden = true; e.at = Date(); save(q.cacheKey, e); return nil
         }
+        // The version on disk (e.g. after "No Lyrics"): no network needed.
+        if e.chosen == id, let lrc = e.lrc {
+            let cues = Lyrics.parseLRC(lrc, duration: q.duration)
+            if !cues.isEmpty { e.hidden = nil; e.at = Date(); save(q.cacheKey, e); return cues }
+        }
         guard case let .success(r) = await fetch(path: "/api/get/\(id)", query: []), let r, let lrc = r.syncedLyrics else { return nil }
         let cues = Lyrics.parseLRC(lrc, duration: q.duration)
         guard !cues.isEmpty else { return nil }
         e.chosen = id; e.lrc = lrc; e.hidden = nil; e.at = Date()
         if !e.candidates.contains(where: { $0.id == id }) { e.candidates.insert(r.candidate, at: 0) }
+        save(q.cacheKey, e)
+        return cues
+    }
+
+    /// Id used for lyrics the user imported from an .lrc file.
+    static let importedID = -2
+
+    /// Uses the user's own LRC for this song (kept in the cache like a chosen version).
+    func importLRC(_ text: String, for q: LyricsQuery) -> [Cue]? {
+        let cues = Lyrics.parseLRC(text, duration: q.duration)
+        guard !cues.isEmpty else { return nil }
+        var e = entry(q.cacheKey) ?? Entry(chosen: nil, lrc: nil, candidates: [], at: Date())
+        e.chosen = Self.importedID; e.lrc = text; e.hidden = nil; e.at = Date()
         save(q.cacheKey, e)
         return cues
     }
@@ -112,10 +131,16 @@ actor LyricsService {
         let c = q.attempts.last ?? q
         guard let url = Self.url("/api/search", [URLQueryItem(name: "track_name", value: c.title), URLQueryItem(name: "artist_name", value: c.artist)]) else { return .success([]) }
         do {
-            let (data, resp) = try await session.data(from: url)
+            // Streamed with a cap: search results carry full lyrics and can be large.
+            let (bytes, resp) = try await session.bytes(from: url)
             let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
             if code == 429 || code >= 500 { return .failure(.transient) }
             guard code == 200 else { return .success([]) }
+            var data = Data()
+            for try await chunk in bytes {
+                data.append(chunk)
+                if data.count > Self.maxSearchBytes { bytes.task.cancel(); return .success([]) }
+            }
             return .success(Array(((try? JSONDecoder().decode([LRCLIBRecord].self, from: data)) ?? []).prefix(30)))
         } catch { return .failure(.transient) }
     }

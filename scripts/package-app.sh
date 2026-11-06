@@ -7,30 +7,41 @@
 #   NOTARY_KEY=/path/AuthKey_XXXX.p8 NOTARY_KEY_ID=XXXX NOTARY_ISSUER=<issuer uuid> \
 #   scripts/package-app.sh
 # or NOTARY_PROFILE=<name> for credentials saved with `xcrun notarytool store-credentials`.
-# With a Developer ID and notary credentials the app is notarized, stapled and zipped again.
+# With a Developer ID and notary credentials the app is notarized, stapled and zipped again as
+# build/Subline-<version>.zip; anything else is written as Subline-<version>-local.zip.
+# RELEASE=1 fails unless the result will be signed and notarized.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 APP="$ROOT/build/Subline.app"
-"$ROOT/scripts/build-app.sh"
-VERSION="$(tr -d '[:space:]' < "$ROOT/VERSION")"
-OUT="$ROOT/build/Subline-$VERSION.zip"
-zip_app() { rm -f "$OUT"; ditto -c -k --sequesterRsrc --keepParent "$APP" "$OUT"; }
-zip_app
-
 NOTARY_ARGS=()
 if [[ -n "${NOTARY_PROFILE:-}" ]]; then
   NOTARY_ARGS=(--keychain-profile "$NOTARY_PROFILE")
 elif [[ -n "${NOTARY_KEY:-}" ]]; then
   NOTARY_ARGS=(--key "$NOTARY_KEY" --key-id "${NOTARY_KEY_ID:?NOTARY_KEY_ID is required}" --issuer "${NOTARY_ISSUER:?NOTARY_ISSUER is required}")
 fi
-if [[ "${CODESIGN_IDENTITY:--}" != "-" && ${#NOTARY_ARGS[@]} -gt 0 ]]; then
+SIGNED=0; [[ "${CODESIGN_IDENTITY:--}" != "-" ]] && SIGNED=1
+RELEASE_READY=0; [[ $SIGNED -eq 1 && ${#NOTARY_ARGS[@]} -gt 0 ]] && RELEASE_READY=1
+# RELEASE=1: refuse to produce anything that isn't Developer ID signed and notarized.
+if [[ "${RELEASE:-0}" == 1 && $RELEASE_READY -eq 0 ]]; then
+  echo "RELEASE=1 needs CODESIGN_IDENTITY (Developer ID) and notary credentials" >&2; exit 1
+fi
+"$ROOT/scripts/build-app.sh"
+VERSION="$(tr -d '[:space:]' < "$ROOT/VERSION")"
+# Only a notarized build gets the plain distribution name; anything else is marked local.
+if [[ $RELEASE_READY -eq 1 ]]; then OUT="$ROOT/build/Subline-$VERSION.zip"; else OUT="$ROOT/build/Subline-$VERSION-local.zip"; fi
+zip_app() { rm -f "$OUT"; ditto -c -k --sequesterRsrc --keepParent "$APP" "$OUT"; }
+zip_app
+
+if [[ $RELEASE_READY -eq 1 ]]; then
   echo "notarizing $OUT (usually a few minutes)…"
   xcrun notarytool submit "$OUT" "${NOTARY_ARGS[@]}" --wait --timeout 30m | tee "$ROOT/build/notary.log"
   grep -q 'status: Accepted' "$ROOT/build/notary.log" || { echo "notarization was not accepted; see build/notary.log and 'xcrun notarytool log <id>'" >&2; exit 1; }
   xcrun stapler staple "$APP"
   spctl -a -t exec -vv "$APP"
   zip_app
-elif [[ "${CODESIGN_IDENTITY:--}" != "-" ]]; then
-  echo "signed but not notarized: set NOTARY_PROFILE or NOTARY_KEY/NOTARY_KEY_ID/NOTARY_ISSUER" >&2
+elif [[ $SIGNED -eq 1 ]]; then
+  echo "signed but NOT notarized (local use only): set NOTARY_PROFILE or NOTARY_KEY/NOTARY_KEY_ID/NOTARY_ISSUER" >&2
+else
+  echo "ad-hoc signed (this Mac only); use RELEASE=1 with a Developer ID for distribution" >&2
 fi
 echo "wrote $OUT"

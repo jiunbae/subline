@@ -22,7 +22,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             StoreShots.show(args[i + 1])
             return
         }
-        LegacyMigration.run() // previous name ("Now Playing"): preferences, data folder, browser registrations
         var setupError: String?
         do { try SublinePaths.ensureSupportDir() } catch { setupError = "\(SublinePaths.supportDir.path): \(error.localizedDescription)" }
         // Single instance: the flock is authoritative; only its holder may unlink/bind the socket.
@@ -116,6 +115,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+// Before anything reads preferences (PlayerModel and friends load them when the delegate is built).
+if !CommandLine.arguments.contains("--store-shot") { LegacyMigration.run() }
 let app = NSApplication.shared
 let delegate = MainActor.assumeIsolated { AppDelegate() }
 app.delegate = delegate

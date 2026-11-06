@@ -155,3 +155,8 @@
 "Show the current line next to the menu bar icon or under the notch: menu › Also Show Current Line." = "Show the current line next to the menu bar icon or under the notch: menu › Also Show Current Line.";
 "Lyrics lookups" = "Lyrics lookups";
 "For YouTube Music, Spotify and Music, the app asks lrclib.net (title, artist, album, length) and keeps the result on this Mac. The extension itself sends nothing anywhere." = "For YouTube Music, Spotify and Music, the app asks lrclib.net (title, artist, album, length) and keeps the result on this Mac. The extension itself sends nothing anywhere.";
+"Imported LRC File" = "Imported LRC File";
+"Import LRC File…" = "Import LRC File…";
+"Synced lyrics for “%@”" = "Synced lyrics for “%@”";
+"No timed lines in this file" = "No timed lines in this file";
+"An LRC file has lines like “[01:23.45] lyrics”." = "An LRC file has lines like “[01:23.45] lyrics”.";

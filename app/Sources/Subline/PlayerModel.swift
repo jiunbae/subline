@@ -206,6 +206,8 @@ final class PlayerModel {
     @ObservationIgnored private var lyricsTask: Task<Void, Never>?
     @ObservationIgnored private var lyricsRetries = 0
     @ObservationIgnored private var derivedSig: String?
+    @ObservationIgnored private var derivedFor: [Cue] = []
+    @ObservationIgnored private var derivedGen = 0
     /// Language pair waiting for a download (menu: the note item starts it).
     @ObservationIgnored private(set) var pendingDownload: (String, String)?
 
@@ -419,6 +421,10 @@ final class PlayerModel {
             assign(\.captionTrackID, nil)
             setLoading(false)
             assign(\.lyricsSearching, false)
+            // Nothing plays: a later return of the same song (new tab, reconnect) starts fresh.
+            lyricsTask?.cancel(); lyricsTask = nil; lyricsFor = nil
+            derivedTask?.cancel(); derivedTask = nil; derivedSig = nil; derivedFor = []
+            currentVideo = nil
             timer?.cancel()
             onPresence?(false, false, nil)
             if Self.debugDump { dumpState() }
@@ -498,10 +504,16 @@ final class PlayerModel {
     /// Romanized / translated second line for the current main text (rebuilt when the text changes).
     private func scheduleDerived(_ s: TabState, _ t: TrackInfo, _ main: CueSet?) {
         guard let pref = preferredSecondaryID, DerivedLines.isDerived(pref), let main, main.synced, !cues.isEmpty, !(t.isAd ?? false) else { return }
-        let sig = [t.videoId, pref, main.trackID ?? main.source, String(cues.count), cues.first?.text ?? "", String(cues.last?.s ?? 0)].joined(separator: "|")
-        guard sig != derivedSig else { return }
+        let sig = ["\(s.key)", t.videoId, pref, main.trackID ?? main.source].joined(separator: "|")
+        // Same session/track/choice and the same main text (equal arrays usually share storage) → done.
+        guard sig != derivedSig || cues != derivedFor else { return }
         derivedSig = sig
+        derivedFor = cues
+        derivedGen &+= 1
+        let gen = derivedGen
         derivedTask?.cancel()
+        // Don't leave lines made from the previous text up while the new ones are built.
+        if DerivedLines.isDerived(s.secondaryCueSet?.trackID) { clearSecondary(s.key, t.videoId) }
         let key = s.key, vid = t.videoId, source = cues, lang = DerivedLines.language(of: cues, hint: main.lang)
         derivedTask = Task { [weak self] in
             var out: [Cue] = []
@@ -520,7 +532,8 @@ final class PlayerModel {
                 case .unavailable: note = L10n.string("Translation isn't available for this language")
                 }
             }
-            guard !Task.isCancelled, let self, self.store.active?.track?.videoId == vid, self.derivedSig == sig else { return }
+            guard !Task.isCancelled, let self, self.derivedGen == gen, self.store.active?.key == key,
+                  self.store.active?.track?.videoId == vid else { return }
             self.assign(\.derivedNote, note)
             self.pendingDownload = download
             var set = CueSet(videoId: vid, source: pref == DerivedLines.romajiID ? "romanized" : "apple-translate",
@@ -691,14 +704,15 @@ final class PlayerModel {
 
     /// Once per song; skipped when the page already sent synced lyrics of its own.
     private func scheduleLyrics(_ s: TabState, _ t: TrackInfo) {
-        guard lyricsFor != t.videoId else { return }
+        let ident = "\(s.key)|\(t.videoId)"
+        guard lyricsFor != ident else { return }
         guard let q = lyricsQuery(t) else { return } // duration may arrive later: try again then
         // A page reports its own text first (YouTube Music sends an empty placeholder); wait for that,
         // so lyrics the page already has are never raced. Spotify/Music have no text of their own.
         let fromPage = s.key.conn != NativePlayers.conn
         if fromPage, s.cueSet?.videoId != t.videoId { return }
         if let cs = s.cueSet, cs.videoId == t.videoId, cs.synced, !cs.cues.isEmpty, cs.source != "lrclib" { return }
-        lyricsFor = t.videoId
+        lyricsFor = ident
         lyricsRetries = 0
         assign(\.lyricsCandidates, [])
         assign(\.lyricsChosenID, nil)
@@ -713,7 +727,7 @@ final class PlayerModel {
             guard !Task.isCancelled else { return }
             await MainActor.run { self?.assign(\.lyricsSearching, true) }
             let outcome = await lyricsService.lookup(q)
-            guard !Task.isCancelled, let self, self.lyricsFor == vid else { return }
+            guard !Task.isCancelled, let self, self.lyricsFor == "\(key)|\(vid)" else { return }
             self.assign(\.lyricsSearching, false)
             switch outcome {
             case let .found(cues, chosen, candidates):
@@ -751,6 +765,17 @@ final class PlayerModel {
             self.assign(\.lyricsChosenID, id)
             self.applyLyrics(cues ?? [], key: key, vid: vid)
         }
+    }
+
+    /// Shows an .lrc file for this song (remembered). Returns false when the file has no timed lines.
+    func importLyrics(_ text: String) async -> Bool {
+        guard let s = store.active, let t = s.track, let q = lyricsQuery(t) else { return false }
+        let key = s.key, vid = t.videoId
+        lyricsTask?.cancel()
+        guard let cues = await lyricsService.importLRC(text, for: q), store.active?.track?.videoId == vid else { return false }
+        assign(\.lyricsChosenID, LyricsService.importedID)
+        applyLyrics(cues, key: key, vid: vid)
+        return true
     }
 
     /// Drops the cached result and asks LRCLIB again.

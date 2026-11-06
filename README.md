@@ -231,7 +231,8 @@ scripts/store-assets.sh                      # Web Store images + README banner,
 
 Local builds are ad-hoc signed. `scripts/package-app.sh` signs with a Developer ID, notarizes, staples and zips when given
 `CODESIGN_IDENTITY` and notary credentials (`NOTARY_PROFILE`, or `NOTARY_KEY` / `NOTARY_KEY_ID` / `NOTARY_ISSUER`
-for an App Store Connect API key). The marketing version comes from `VERSION`, the build number from the git commit count.
+for an App Store Connect API key). Use `RELEASE=1` for a release: it fails unless the zip will be signed and
+notarized. Without notarization the output is named `Subline-<version>-local.zip`. The marketing version comes from `VERSION`, the build number from the git commit count.
 </details>
 
 <details>

@@ -31,6 +31,7 @@ final class NativePlayers {
     var onDeniedChange: ((Bool) -> Void)?
     private var lastDeniedCheck: [App: Date] = [:]
     private var artworkTries: [String: Int] = [:]
+    private var lastInfo: [App: [AnyHashable: Any]] = [:]
 
     private struct Snapshot: Equatable {
         var id: String, title: String, artist: String, album: String?, duration: Double?, artwork: String?
@@ -98,16 +99,21 @@ final class NativePlayers {
             lastDeniedCheck[app] = Date()
             denied.remove(app)
         }
-        if denied.contains(app) {
-            let ms = (info["Duration"] as? Double) ?? (info["Total Time"] as? Double)
-            let id = (info["Track ID"] as? String) ?? (info["PersistentID"].map { "\($0)" }) ?? (info["Name"] as? String ?? "")
-            let snap = Snapshot(id: id, title: info["Name"] as? String ?? "", artist: info["Artist"] as? String ?? "",
-                                album: info["Album"] as? String, duration: ms.map { $0 / 1000 }, artwork: shown[app]?.id == id ? shown[app]?.artwork : nil,
-                                position: (info["Playback Position"] as? Double) ?? 0, playing: state == "playing")
-            publish(app, snap)
-        } else {
-            query(app)
-        }
+        lastInfo[app] = info
+        if denied.contains(app) { publishFromNotification(app) } else { query(app) }
+    }
+
+    /// What the notification alone tells us (no Automation access): no exact position for Music,
+    /// no Music artwork, no controls.
+    private func publishFromNotification(_ app: App) {
+        guard let info = lastInfo[app] else { return }
+        let state = (info["Player State"] as? String ?? "").lowercased()
+        let ms = (info["Duration"] as? Double) ?? (info["Total Time"] as? Double)
+        let id = (info["Track ID"] as? String) ?? (info["PersistentID"].map { "\($0)" }) ?? (info["Name"] as? String ?? "")
+        let snap = Snapshot(id: id, title: info["Name"] as? String ?? "", artist: info["Artist"] as? String ?? "",
+                            album: info["Album"] as? String, duration: ms.map { $0 / 1000 }, artwork: shown[app]?.id == id ? shown[app]?.artwork : nil,
+                            position: (info["Playback Position"] as? Double) ?? 0, playing: state == "playing")
+        publish(app, snap)
     }
 
     private func query(_ app: App) {
@@ -133,7 +139,10 @@ final class NativePlayers {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 if let err {
-                    if err == -1743 { self.denied.insert(app); self.lastDeniedCheck[app] = Date() } // Automation access declined
+                    if err == -1743 { // Automation access declined: fall back to what the notification said
+                        self.denied.insert(app); self.lastDeniedCheck[app] = Date()
+                        if self.enabled { self.publishFromNotification(app) }
+                    }
                     return
                 }
                 // Turned off, or the app quit, while the script was queued: don't bring it back.
@@ -208,6 +217,7 @@ final class NativePlayers {
     }
 
     private func clear(_ app: App) {
+        lastInfo[app] = nil
         guard shown.removeValue(forKey: app) != nil else { return }
         onMessage?(.gone(tab: app.rawValue))
         updatePolling()
