@@ -22,7 +22,7 @@ show what you are playing on YouTube, YouTube Music, Spotify or Apple Music in a
 - No browsing history is read. The extension runs only on `www.youtube.com` and `music.youtube.com`.
 - It never runs in incognito/private windows (the extension declares `incognito: not_allowed`).
 - The extension makes no network requests at all; without the Subline app connected, it sends nothing anywhere.
-- The extension never reads your cookies or YouTube session and never calls YouTube's internal APIs.
+- The extension never reads your cookies or YouTube session tokens. On YouTube Music it asks the open page for the current song's lyrics, the same request the page's own Lyrics tab makes (to music.youtube.com, signed by the page itself); only the lyric lines go to the app. No other YouTube internal request is made.
   It only reads the captions the YouTube player itself downloads, and switches the player's caption
   track when you choose a language (restoring your own setting afterwards).
 - No data is sold or shared, and none is used for anything except the features above.

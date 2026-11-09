@@ -1,6 +1,7 @@
-/* Runs in YouTube's MAIN world. Never reads cookies, never calls YouTube's internal APIs, never posts
-   request URLs or tokens: it only observes the caption responses the player itself downloads and
-   drives the player's public caption options. */
+/* Runs in YouTube's MAIN world. Never reads cookies, never posts request URLs or tokens: it observes
+   the caption responses the player itself downloads and drives the player's public caption options.
+   On YouTube Music it also asks the page's own network layer for the song's lyrics (the same request
+   the Lyrics tab makes, signed by the page as the signed-in user); only the lyric lines are posted. */
 (() => {
   'use strict';
   if (window.__sublineBridge) return;
@@ -247,6 +248,89 @@
       }
     } finally { ccBusy = false; }
   }
+  // YouTube Music lyrics: next → the Lyrics tab's browseId → browse. Licensed lyrics depend on the
+  // signed-in account, so the request goes through the page's own network manager (which adds its
+  // auth); without it a plain same-origin request is tried, which usually gets the signed-out answer.
+  const lyricsDone = new Map(); // videoId → result, a few recent songs
+  function walk(node, visit, depth = 0) {
+    if (!node || typeof node !== 'object' || depth > 40) return;
+    if (visit(node) === false) return;
+    for (const v of Array.isArray(node) ? node : Object.values(node)) walk(v, visit, depth + 1);
+  }
+  async function innertube(path, body) {
+    const app = document.querySelector('ytmusic-app');
+    const nm = app?.networkManager || app?.networkManager_;
+    if (typeof nm?.fetch === 'function') {
+      try { const r = await nm.fetch(path + '?prettyPrint=false', body); if (r && typeof r === 'object') return {via: 'page', r}; }
+      catch (e) { log('networkManager failed', String(e)); }
+    }
+    const cfg = window.ytcfg?.get ? k => window.ytcfg.get(k) : () => undefined;
+    const context = cfg('INNERTUBE_CONTEXT');
+    if (!context) return null;
+    const key = cfg('INNERTUBE_API_KEY');
+    const res = await originalFetch.call(window, `/youtubei/v1${path}?prettyPrint=false${key ? '&key=' + encodeURIComponent(key) : ''}`, {
+      method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json',
+        'X-Goog-AuthUser': String(cfg('SESSION_INDEX') ?? 0), 'X-Youtube-Client-Name': String(cfg('INNERTUBE_CONTEXT_CLIENT_NAME') ?? 67),
+        'X-Youtube-Client-Version': String(cfg('INNERTUBE_CLIENT_VERSION') ?? context.client?.clientVersion ?? '')},
+      body: JSON.stringify({context, ...body})});
+    if (!res.ok) return null;
+    const len = Number(res.headers.get('content-length'));
+    if (len > 5_000_000) return null;
+    return {via: 'plain', r: await res.json()};
+  }
+  const runsText = v => typeof v?.simpleText === 'string' ? v.simpleText : Array.isArray(v?.runs) ? v.runs.map(r => r?.text || '').join('') : (typeof v?.content === 'string' ? v.content : '');
+  function parseLyrics(data) {
+    // Timed: [{lyricLine, cueRange: {startTimeMilliseconds, endTimeMilliseconds}}] (field names vary by client).
+    let timed = null, plain = '', source = '';
+    walk(data, n => {
+      for (const k of ['timedLyricsData', 'timedLyrics', 'lines']) {
+        const a = n[k];
+        if (!timed && Array.isArray(a) && a.length && (a[0]?.cueRange || a[0]?.startTimeMs !== undefined || a[0]?.lyricLine !== undefined)) timed = a;
+      }
+      const shelf = n.musicDescriptionShelfRenderer;
+      if (shelf && !plain) { plain = runsText(shelf.description); source = runsText(shelf.footer); }
+    });
+    if (timed) {
+      const ms = v => Number(v?.cueRange?.startTimeMilliseconds ?? v?.startTimeMs ?? v?.startTimeMilliseconds);
+      const end = v => Number(v?.cueRange?.endTimeMilliseconds ?? v?.endTimeMs ?? v?.endTimeMilliseconds);
+      const cues = timed.slice(0, 5000).map(v => ({s: ms(v) / 1000, e: end(v) / 1000, text: String(v?.lyricLine ?? runsText(v?.text) ?? v?.words ?? '').trim()}))
+        .filter(c => Number.isFinite(c.s)).map(c => ({s: c.s, ...(Number.isFinite(c.e) && c.e > c.s ? {e: c.e} : {}), text: c.text}))
+        .sort((a, b) => a.s - b.s);
+      if (cues.some(c => c.text)) return {synced: true, cues, source};
+    }
+    if (plain.trim()) {
+      const lines = plain.replace(/\r/g, '').split('\n').map(l => l.trim()).slice(0, 5000);
+      while (lines.length && !lines[lines.length - 1]) lines.pop();
+      return {synced: false, cues: lines.map((text, i) => ({s: i, text})), source};
+    }
+    return null;
+  }
+  async function fetchLyrics(id) {
+    if (location.hostname !== 'music.youtube.com' || !/^[A-Za-z0-9_-]{6,20}$/.test(id)) return;
+    let result = lyricsDone.get(id);
+    if (!result) {
+      result = {cues: [], synced: true, note: ''};
+      try {
+        const next = await innertube('/next', {videoId: id});
+        let browseId = '';
+        walk(next?.r, n => {
+          const b = n.browseEndpoint?.browseId;
+          if (!browseId && typeof b === 'string' && b.startsWith('MPLY')) browseId = b;
+        });
+        if (!browseId) result.note = 'no-lyrics-tab:' + (next?.via || 'none');
+        else {
+          const page = await innertube('/browse', {browseId});
+          const parsed = parseLyrics(page?.r);
+          if (parsed) result = {...parsed, note: (parsed.synced ? 'timed:' : 'plain:') + page.via};
+          else result.note = 'empty:' + (page?.via || 'none');
+        }
+      } catch (e) { result.note = 'err:' + String(e?.message || e).slice(0, 24); log('lyrics failed', String(e)); }
+      lyricsDone.set(id, result);
+      while (lyricsDone.size > 6) lyricsDone.delete(lyricsDone.keys().next().value);
+    }
+    log('lyrics', id, result.note, result.cues.length);
+    if (videoId() === id) post('lyrics', {videoId: id, cues: result.cues, synced: result.synced, note: result.note});
+  }
   window.addEventListener('message', event => {
     const m = event.data;
     if (event.source !== window || event.origin !== location.origin || m?.channel !== CHANNEL || m.direction !== 'to-main') return;
@@ -255,6 +339,7 @@
     // before it touches the player (SPA navigation can happen while an earlier command runs).
     const forCurrent = fn => (...args) => (typeof m.videoId !== 'string' || m.videoId === videoId()) ? fn(...args) : undefined;
     if (m.kind === 'connectCaptions') void queued(forCurrent(connectCaptions))();
+    if (m.kind === 'lyrics' && typeof m.videoId === 'string') void fetchLyrics(m.videoId);
     if (m.kind === 'selectCaptions' && typeof m.trackId === 'string' && /^[A-Za-z0-9_-]{1,24}(:asr)?$/.test(m.trackId)) void queued(forCurrent(selectCaptionsNow))(m.trackId);
   });
 })();

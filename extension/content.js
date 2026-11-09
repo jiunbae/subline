@@ -133,7 +133,11 @@
     if (signature !== newSignature) { signature = newSignature; send({type:'track', ...track}); }
     if (changed || adChanged) {
       clock();
-      if (!track.isAd) { emitCues(cues || emptyCues()); liveCaption(); }
+      if (!track.isAd) {
+        emitCues(cues || emptyCues()); liveCaption();
+        // The placeholder goes first (the app starts LRCLIB on it); the page's own lyrics follow.
+        if (music && changed && !cues?.cues?.length) askMain('lyrics', {videoId: track.videoId});
+      }
       else { captionText = ''; send({type:'liveCaption', videoId:track.videoId, text:''}); }
     }
     sendCaptionTracks();
@@ -152,6 +156,14 @@
       return;
     }
     if (!track || track.isAd || m.videoId !== track.videoId || !Array.isArray(m.cues)) return;
+    if (m.kind === 'lyrics') {
+      if (!music || !m.cues.length) return; // nothing from the page: the placeholder stands
+      const lines = m.cues.filter(c => c && Number.isFinite(c.s) && typeof c.text === 'string').slice(0, 5000)
+        .map(c => ({s: c.s, ...(Number.isFinite(c.e) ? {e: c.e} : {}), text: c.text.slice(0, 2000)}));
+      if (lines.some(c => c.text)) emitCues({type:'cues', videoId:track.videoId, source:'ytm-lyrics', kind:'lyrics',
+        synced: m.synced === true, cues: lines});
+      return;
+    }
     // Cues are already normalized in the MAIN-world bridge (incl. ASR rolling dedupe) and
     // re-sanitized in the service worker. parsers.js is not available here: Chrome injects a
     // file listed in several content_scripts entries only once per frame (into MAIN first).

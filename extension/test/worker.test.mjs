@@ -155,15 +155,18 @@ test('reconnect replays tabs in playback-activation order (last started is repla
   const clocks=h.messages.filter(m=>m.type==='clock').slice(-2).map(m=>m.tabId);
   assert.deepEqual(clocks,[7,8]);
 });
-test('least privilege: https-only hosts, no cookie or internal-API access in shipped scripts',()=>{
+test('least privilege: https-only hosts, no cookie or auth access; internal API only for YTM lyrics',()=>{
   const m=JSON.parse(source('manifest.json'));
   assert.deepEqual(m.permissions,['nativeMessaging','alarms']);
   assert.deepEqual(m.host_permissions,['https://www.youtube.com/*','https://music.youtube.com/*']); // lyrics are looked up by the app
   assert.ok([...m.host_permissions,...m.content_scripts.flatMap(c=>c.matches)].every(p=>p.startsWith('https://')));
   for (const f of ['bridge.js','content.js','adapters.js','parsers.js','service-worker.js']) {
     const s=source(f);
-    assert.ok(!/document\.cookie|SAPISID|youtubei\/v1|Authorization/.test(s), `${f} must not touch cookies, auth headers or internal APIs`);
+    assert.ok(!/document\.cookie|SAPISID|Authorization/.test(s), `${f} must not touch cookies or auth headers`);
+    // Only the bridge's YouTube Music lyrics lookup (the Lyrics tab's own next/browse requests) may use it.
+    if (f !== 'bridge.js') assert.ok(!/youtubei\/v1/.test(s), `${f} must not call internal APIs`);
   }
+  assert.equal(source('bridge.js').match(/youtubei\/v1/g).length, 1);
   const h=harness(); const count=h.messages.length;
   h.runtime.onMessage.callbacks[0]({op:'publish',message:track},{id:h.runtime.id,frameId:0,url:'http://www.youtube.com/watch?v=dQw4w9WgXcQ',tab:h.tab},()=>{});
   assert.equal(h.messages.length,count); // plain-http pages are ignored

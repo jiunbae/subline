@@ -44,8 +44,8 @@ Playback stays in your browser. The app only receives metadata, the clock and ca
   <tr>
     <td width="50%" valign="top">
       <h4>🎤 Synced lyrics &amp; captions</h4>
-      YouTube captions captured from the player itself; lyrics from LRCLIB for YouTube Music, Spotify and Apple Music,
-      with the next line previewed. Tap a line to jump there. Wrong lyrics? Pick another version.
+      YouTube captions captured from the player itself; on YouTube Music the page's own lyrics first, then
+      LRCLIB (also for Spotify and Apple Music), timed lyrics always preferred, with the next line previewed. Tap a line to jump there. Wrong lyrics? Pick another version.
     </td>
     <td width="50%" valign="top">
       <h4>🌐 Two languages at once</h4>
@@ -86,7 +86,7 @@ Playback stays in your browser. The app only receives metadata, the clock and ca
     </td>
     <td valign="top">
       <h4>🔒 Private by design</h4>
-      No accounts, analytics or cookies. The extension makes no network requests; the app looks up lyrics on
+      No accounts, analytics or cookies. The extension only asks YouTube Music's open page for its lyrics; the app looks up lyrics on
       lrclib.net (title, artist, album, length) and caches them for offline use. English and Korean UI, VoiceOver.
     </td>
   </tr>

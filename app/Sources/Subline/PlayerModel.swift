@@ -736,6 +736,9 @@ final class PlayerModel {
             switch outcome {
             case let .found(cues, chosen, candidates):
                 self.assign(\.lyricsCandidates, candidates)
+                // The page's own synced lyrics (YouTube Music) arrived during the lookup: they stay,
+                // unless this song has the user's imported file.
+                if chosen != LyricsService.importedID, self.pageHasSyncedLyrics(key: key, vid: vid) { break }
                 self.assign(\.lyricsChosenID, chosen)
                 self.applyLyrics(cues, key: key, vid: vid)
             case let .notFound(candidates):
@@ -748,6 +751,11 @@ final class PlayerModel {
                 self.runLyrics(q, key: key, vid: vid, delay: wait)
             }
         }
+    }
+
+    private func pageHasSyncedLyrics(key: TabKey, vid: String) -> Bool {
+        guard let cs = store.tabs[key]?.cueSet else { return false }
+        return cs.videoId == vid && cs.source == "ytm-lyrics" && cs.synced && !cs.cues.isEmpty
     }
 
     private func applyLyrics(_ cues: [Cue], key: TabKey, vid: String) {
