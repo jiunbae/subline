@@ -1,4 +1,4 @@
-# Publishing to the Chrome Web Store (unlisted) and wiring the app
+# Publishing to the Chrome Web Store and wiring the app
 
 ## 1. One-time: developer account
 1. Go to the [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole) and sign in with the Google account that should own the item.
@@ -13,8 +13,8 @@ scripts/build-app.sh && scripts/store-assets.sh   # → store/assets/*.png (scre
 ## 3. Create the item
 1. Dashboard → **New item** → upload the zip.
 2. **Store listing:** fill it in from [LISTING.md](LISTING.md) and upload the icon, screenshots and promo tile.
-3. **Privacy practices:** single purpose, permission justifications and data usage from [LISTING.md](LISTING.md). Publish [PRIVACY.md](PRIVACY.md) at a public URL and paste the link.
-4. **Distribution:** visibility **Unlisted**.
+3. **Privacy practices:** single purpose, permission justifications and data usage from [LISTING.md](LISTING.md). Privacy policy URL: https://github.com/jiunbae/subline/blob/main/store/PRIVACY.md
+4. **Distribution:** visibility **Public**.
 5. **Submit for review.** It usually takes from a few days to a couple of weeks.
 
 ## 4. After approval: connect the app to the store ID

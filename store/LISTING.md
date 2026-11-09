@@ -34,8 +34,9 @@ Subline app for macOS, which shows it in a small floating window above your othe
 Requires the Subline app for macOS (macOS 14 or later; universal app for Apple Silicon and Intel).
 Without it the extension does nothing and sends nothing. It does not run in incognito windows.
 
-Privacy: no accounts, analytics or tracking. The extension makes no network requests; playback
-information goes only to the Subline app on your Mac. The app looks up synced lyrics on lrclib.net,
+Privacy: no accounts, analytics or tracking. Playback information goes only to the Subline app on
+your Mac. On YouTube Music the extension asks the open page for the song's lyrics (the same request
+the page's Lyrics tab makes); it never reads cookies. The app looks up synced lyrics on lrclib.net,
 a public lyrics database (song title, artist, album and length). See the privacy policy for details.
 ```
 
@@ -55,7 +56,8 @@ Subline는 YouTube나 YouTube Music 탭에서 재생 중인 곡 정보를 macOS�
 macOS용 Subline 앱(macOS 14 이상, Apple Silicon·Intel 공용)이 있어야 동작합니다. 앱이 없으면 아무것도 하지 않고
 아무 데이터도 보내지 않습니다. 시크릿 창에서는 동작하지 않습니다.
 
-개인정보: 계정, 분석, 추적이 없습니다. 확장은 네트워크 요청을 하지 않고, 재생 정보는 내 Mac의 Subline 앱으로만 갑니다.
+개인정보: 계정, 분석, 추적이 없습니다. 재생 정보는 내 Mac의 Subline 앱으로만 갑니다. YouTube Music에서는 열린 페이지에
+그 곡의 가사를 요청합니다(페이지의 가사 탭과 같은 요청). 쿠키는 읽지 않습니다.
 시간 맞춤 가사는 앱이 공개 가사 데이터베이스 lrclib.net에서 찾습니다(곡 제목, 아티스트, 앨범, 길이).
 ```
 
@@ -71,24 +73,24 @@ macOS용 Subline 앱(macOS 14 이상, Apple Silicon·Intel 공용)이 있어야 
 |---|---|
 | `nativeMessaging` | Sends playback state, artwork URLs and captions/lyrics to the user's locally installed Subline macOS app, and receives playback commands from it. This is the extension's only output. |
 | `alarms` | Schedules a reconnect to the local Subline app after it restarts or is launched later, without keeping the service worker alive. |
-| Host `https://www.youtube.com`, `https://music.youtube.com` | Reads the current video/track (title, artist, artwork, position) and the captions the YouTube player itself downloads, switches the player's caption track when the user picks a language, and performs play/pause/seek/next/previous on the user's request. No cookies are read and no requests are made to YouTube. |
+| Host `https://www.youtube.com`, `https://music.youtube.com` | Reads the current video/track (title, artist, artwork, position) and the captions the YouTube player itself downloads, switches the player's caption track when the user picks a language, performs play/pause/seek/next/previous on the user's request, and on YouTube Music asks the page for the current song's lyrics (the request the page's own Lyrics tab makes, sent by the page itself). No cookies or tokens are read and no other requests are made. |
 
 **Remote code:** No, I am not using remote code. All JavaScript is in the package.
 
 **Data usage** (check exactly these):
 
-- ☑ **Website content**. Track title, artist, album, duration and captions/lyrics of the playing video are sent to the user's own Subline app on the same Mac. The extension itself makes no network requests.
+- ☑ **Website content**. Track title, artist, album, duration and captions/lyrics of the playing video are sent to the user's own Subline app on the same Mac. The only request the extension causes is the YouTube Music page's own lyrics request for the current song.
 - ☐ Everything else (personally identifiable info, health, financial, authentication, personal communications, location, web history, user activity) stays **unchecked**.
-  - The extension never reads cookies or the YouTube session and makes no requests to YouTube itself; it only observes the caption files the YouTube player downloads.
+  - The extension never reads cookies or session tokens. On YouTube it only observes the caption files the player downloads; on YouTube Music it asks the page for the current song's lyrics.
 
 Certify all three:
 - I do not sell or transfer user data to third parties, outside of the approved use cases.
 - I do not use or transfer user data for purposes that are unrelated to my item's single purpose.
 - I do not use or transfer user data to determine creditworthiness or for lending purposes.
 
-**Privacy policy URL:** publish `store/PRIVACY.md` somewhere public (a public GitHub repo file, GitHub Pages or a gist) and paste that URL.
+**Privacy policy URL:** https://github.com/jiunbae/subline/blob/main/store/PRIVACY.md
 
 ## Distribution tab
 
-- Visibility: **Unlisted**. Only people with the link can install it; it is not searchable.
+- Visibility: **Public**.
 - Regions: all.
