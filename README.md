@@ -16,6 +16,12 @@
 </p>
 
 <p align="center">
+  <a href="https://subline.jiun.dev/#film"><img src="site/shots/film.jpg" alt="Watch the 25-second Subline film on subline.jiun.dev" width="80%"></a><br>
+  <sub><a href="https://subline.jiun.dev/#film">▶ Watch the 25-second film</a> · <a href="https://subline.jiun.dev">subline.jiun.dev</a></sub>
+</p>
+
+<p align="center">
+  <a href="#download">Download</a> ·
   <a href="#quick-start">Quick start</a> ·
   <a href="#features">Features</a> ·
   <a href="#how-it-works">How it works</a> ·
@@ -92,7 +98,16 @@ Playback stays in your browser. The app only receives metadata, the clock and ca
   </tr>
 </table>
 
+## Download
+
+Get `Subline-<version>.zip` from the [latest release](https://github.com/jiunbae/subline/releases/latest)
+(Developer ID signed and notarized, universal, macOS 14+), unzip it, move `Subline.app` to Applications and open it.
+The browser extension for YouTube is in Chrome Web Store review (public listing); until it is live, the setup window
+installs the bundled copy.
+
 ## Quick start
+
+From a download (above), or build it yourself:
 
 ```bash
 scripts/build-app.sh --install     # universal build → ~/Applications, then launches it
@@ -135,7 +150,7 @@ Everything below is optional except the extension (for YouTube) and Automation (
 4. If the app isn't running, the extension's connection attempt launches it. After you quit from the menu,
    it stays quit until you open it yourself.
 
-Publishing to the Chrome Web Store (unlisted) and the one-click install path: [store/SUBMISSION.md](store/SUBMISSION.md).
+Publishing to the Chrome Web Store (public listing, in review) and the one-click install path: [store/SUBMISSION.md](store/SUBMISSION.md).
 </details>
 
 <details>
@@ -224,6 +239,7 @@ ARCHS=arm64 scripts/build-app.sh             # fast single-architecture build
 cd app && swift test                         # Core: framing, messages, clock interpolation, cue timeline, tab selection
 node --test extension/test/*.test.mjs        # Extension: JSON3/ASR/LRC parsers, service worker and bridge in a VM
 scripts/store-assets.sh                      # Web Store images + README banner, rendered from the real views
+scripts/render-landing-media.sh              # landing film + hero loop (site/shots), rendered offscreen from the real views
 ```
 
 <details>
@@ -233,6 +249,11 @@ Local builds are ad-hoc signed. `scripts/package-app.sh` signs with a Developer 
 `CODESIGN_IDENTITY` and notary credentials (`NOTARY_PROFILE`, or `NOTARY_KEY` / `NOTARY_KEY_ID` / `NOTARY_ISSUER`
 for an App Store Connect API key). Use `RELEASE=1` for a release: it fails unless the zip will be signed and
 notarized. Without notarization the output is named `Subline-<version>-local.zip`. The marketing version comes from `VERSION`, the build number from the git commit count.
+
+When a release changes how the overlay looks, re-render the landing page's film and hero loop from the real views:
+`scripts/render-landing-media.sh` (about a minute; needs ffmpeg) writes `site/shots`, which
+`.github/workflows/pages.yml` publishes to [subline.jiun.dev](https://subline.jiun.dev).
+`scripts/render-landing-media.sh preview` writes contact-sheet stills into `build/landing-preview`.
 </details>
 
 <details>

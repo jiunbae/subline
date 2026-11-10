@@ -8,3 +8,6 @@ keys/*.p8
 keys/*.p12
 *.p8
 *.p12
+
+# The landing page (a global ignore may list /site)
+!/site
