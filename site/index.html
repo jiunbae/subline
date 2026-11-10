@@ -16,7 +16,7 @@
   <link rel="icon" type="image/png" href="shots/icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&family=IBM+Plex+Mono:wght@500&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&family=Jua&family=IBM+Plex+Mono:wght@500&display=swap">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Subline","description":"Floating, time-synced lyrics and captions for YouTube, YouTube Music, Spotify and Apple Music on macOS.","applicationCategory":"MultimediaApplication","operatingSystem":"macOS 14 or later","url":"https://subline.jiun.dev/","downloadUrl":"https://github.com/jiunbae/subline/releases/latest","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}</script>
   <style>
     :root {
@@ -52,6 +52,14 @@
     .nav nav a { text-decoration: none; }
     .nav nav a:hover { text-decoration: underline; text-underline-offset: 4px; }
 
+    .lang { display: inline-flex; gap: 2px; background: #fff; border-radius: 999px; padding: 3px; box-shadow: 3px 3px 0 var(--ink); }
+    .lang button { font: 700 13px/1 var(--body); border: 0; background: transparent; color: var(--ink); padding: 7px 11px; border-radius: 999px; cursor: pointer; }
+    .lang button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+    .nav nav { align-items: center; }
+    /* Korean: the rounded display face has no Hangul, so headings use Jua; body keeps the system face. */
+    html:lang(ko) { --round: "Jua", "M PLUS Rounded 1c", "Apple SD Gothic Neo", system-ui, sans-serif; }
+    html:lang(ko) h1, html:lang(ko) h2, html:lang(ko) h3, html:lang(ko) .eyebrow, html:lang(ko) .node b, html:lang(ko) .chip { font-weight: 400; word-break: keep-all; }
+    html:lang(ko) body { word-break: keep-all; }
     .btn { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font: 700 16px/1 var(--body); padding: 15px 22px; border-radius: 999px; border: 0; cursor: pointer; transition: transform .12s ease, box-shadow .12s ease; }
     .btn:hover { transform: translate(-2px, -2px); }
     .btn.dark { background: var(--ink); color: #fff; box-shadow: 5px 5px 0 var(--pink); }
@@ -118,28 +126,29 @@
   <header class="in nav">
     <a class="brand" href="#top" id="top"><img src="shots/icon.png" alt="" width="34" height="34">Subline</a>
     <nav aria-label="Sections">
-      <a href="#film">Film</a>
-      <a href="#features">Features</a>
-      <a href="#privacy">Privacy</a>
-      <a href="#install">Install</a>
+      <a href="#film" data-i18n="nav.film">Film</a>
+      <a href="#features" data-i18n="nav.features">Features</a>
+      <a href="#privacy" data-i18n="nav.privacy">Privacy</a>
+      <a href="#install" data-i18n="nav.install">Install</a>
       <a href="https://github.com/jiunbae/subline" rel="noopener">GitHub</a>
+      <span class="lang" role="group" aria-label="Language"><button type="button" data-lang-btn="en" aria-pressed="true">EN</button><button type="button" data-lang-btn="ko" aria-pressed="false">한국어</button></span>
     </nav>
   </header>
 
   <main>
     <div class="in hero">
       <div>
-        <h1>Your lyrics, <span class="hl">floating</span> on top.</h1>
-        <p class="lede">Sing along to YouTube, YouTube Music, Spotify and Apple Music without switching windows. Synced lines in a small panel that stays over your work.</p>
+        <h1 data-i18n="hero.h">Your lyrics, <span class="hl">floating</span> on top.</h1>
+        <p class="lede" data-i18n="hero.lede">Sing along to YouTube, YouTube Music, Spotify and Apple Music without switching windows. Synced lines in a small panel that stays over your work.</p>
         <div class="actions">
-          <a class="btn dark" href="https://github.com/jiunbae/subline/releases/latest" rel="noopener" data-download>Download for macOS</a>
-          <a class="btn light" href="https://chromewebstore.google.com/detail/dmlghghkjljpbokmhdnhjkpfkpmlhieb" rel="noopener" aria-describedby="soon">Get the extension <span class="soon" id="soon">coming soon</span></a>
+          <a class="btn dark" href="https://github.com/jiunbae/subline/releases/latest" rel="noopener" data-download data-i18n="dl">Download for macOS</a>
+          <a class="btn light" href="https://chromewebstore.google.com/detail/dmlghghkjljpbokmhdnhjkpfkpmlhieb" rel="noopener" aria-describedby="soon"><span data-i18n="ext">Get the extension</span> <span class="soon" id="soon" data-i18n="soon">coming soon</span></a>
         </div>
-        <p class="fine"><span data-version>Latest release</span> · macOS 14+ · Apple silicon &amp; Intel · signed &amp; notarized · free</p>
+        <p class="fine"><span data-version data-i18n="latest">Latest release</span> · <span data-i18n="fine">macOS 14+ · Apple silicon &amp; Intel · signed &amp; notarized · free</span></p>
       </div>
       <div class="frame">
         <video class="autoplay" muted loop playsinline preload="none" poster="shots/loop.jpg" width="1440" height="900"
-               aria-label="A browser window playing a song fades back while Subline's floating lyrics card rises in front, then the lyrics sheet follows the song line by line and jumps to a tapped line.">
+               data-i18n-aria="loop.aria" aria-label="A browser window playing a song fades back while Subline's floating lyrics card rises in front, then the lyrics sheet follows the song line by line and jumps to a tapped line.">
           <source data-src="shots/loop.webm" type="video/webm">
           <source data-src="shots/loop.mp4" type="video/mp4">
         </video>
@@ -148,12 +157,12 @@
 
     <section class="film" id="film" aria-labelledby="film-h">
       <div class="in">
-        <span class="eyebrow">Film</span>
-        <h2 id="film-h">Watch it in 25 seconds</h2>
-        <p class="sub">Every screen in the film is Subline's real overlay, drawn from made-up songs.</p>
+        <span class="eyebrow" data-i18n="nav.film">Film</span>
+        <h2 id="film-h" data-i18n="film.h">Watch it in 25 seconds</h2>
+        <p class="sub" data-i18n="film.sub">Every screen in the film is Subline's real overlay, drawn from made-up songs.</p>
         <div class="frame">
           <video class="autoplay" muted loop playsinline controls preload="none" poster="shots/film.jpg" width="1920" height="1080"
-                 aria-label="Subline in 25 seconds: lyrics leave the browser tab and float over the desktop, lines light up on time and a tapped line jumps playback, a Japanese line shows its romanization underneath, the line also appears in the menu bar, the notch and a mini player, and playback stays in the browser while Subline receives only the title, the clock and the lines.">
+                 data-i18n-aria="film.aria" aria-label="Subline in 25 seconds: lyrics leave the browser tab and float over the desktop, lines light up on time and a tapped line jumps playback, a Japanese line shows its romanization underneath, the line also appears in the menu bar, the notch and a mini player, and playback stays in the browser while Subline receives only the title, the clock and the lines.">
             <source data-src="shots/film.webm" type="video/webm">
             <source data-src="shots/film.mp4" type="video/mp4">
             <img src="shots/film.jpg" alt="Subline's lyrics sheet floating over a desktop, the current line highlighted" loading="lazy">
@@ -164,75 +173,129 @@
 
     <section id="features" aria-labelledby="features-h">
       <div class="in">
-        <span class="eyebrow">Features</span>
-        <h2 id="features-h">Everything you need to sing along</h2>
+        <span class="eyebrow" data-i18n="nav.features">Features</span>
+        <h2 id="features-h" data-i18n="feat.h">Everything you need to sing along</h2>
         <div class="feats">
-          <div class="feat"><h3>Right on time</h3><p>Lines light up with the music, with the next one in view. Tap any line to jump there.</p></div>
-          <div class="feat"><h3>Two languages at once</h3><p>Romanization for Korean, Japanese and Chinese, YouTube's translated captions, or Apple's on-device translation (macOS 26).</p></div>
-          <div class="feat"><h3>Pick your spot</h3><p>Cover, Cover + Line, Lyrics or Mini, in Glass, Tinted or Clear. The current line can also sit in the menu bar or the notch.</p></div>
-          <div class="feat"><h3>Lyrics that find themselves</h3><p>YouTube Music's own lyrics first, then LRCLIB, timed lyrics always preferred. Wrong version? Pick another, or import your own .lrc.</p></div>
-          <div class="feat"><h3>Light on your Mac</h3><p>About 1% CPU while playing and next to nothing when idle. The music never plays twice.</p></div>
-          <div class="feat"><h3>Feels native</h3><p>Liquid Glass on macOS 26, artwork-tinted colors, resize from any edge, click-through mode, VoiceOver and Korean UI.</p></div>
+          <div class="feat"><h3 data-i18n="f0.h">Right on time</h3><p data-i18n="f0.p">Lines light up with the music, with the next one in view. Tap any line to jump there.</p></div>
+          <div class="feat"><h3 data-i18n="f1.h">Two languages at once</h3><p data-i18n="f1.p">Romanization for Korean, Japanese and Chinese, YouTube's translated captions, or Apple's on-device translation (macOS 26).</p></div>
+          <div class="feat"><h3 data-i18n="f2.h">Pick your spot</h3><p data-i18n="f2.p">Cover, Cover + Line, Lyrics or Mini, in Glass, Tinted or Clear. The current line can also sit in the menu bar or the notch.</p></div>
+          <div class="feat"><h3 data-i18n="f3.h">Lyrics that find themselves</h3><p data-i18n="f3.p">YouTube Music's own lyrics first, then LRCLIB, timed lyrics always preferred. Wrong version? Pick another, or import your own .lrc.</p></div>
+          <div class="feat"><h3 data-i18n="f4.h">Light on your Mac</h3><p data-i18n="f4.p">About 1% CPU while playing and next to nothing when idle. The music never plays twice.</p></div>
+          <div class="feat"><h3 data-i18n="f5.h">Feels native</h3><p data-i18n="f5.p">Liquid Glass on macOS 26, artwork-tinted colors, resize from any edge, click-through mode, VoiceOver and Korean UI.</p></div>
         </div>
         <div class="where" aria-label="Works with">
-          <span class="chip">YouTube<small>extension</small></span>
-          <span class="chip">YouTube Music<small>extension</small></span>
-          <span class="chip">Spotify<small>no setup</small></span>
-          <span class="chip">Apple Music<small>no setup</small></span>
+          <span class="chip">YouTube<small data-i18n="chip.ext">extension</small></span>
+          <span class="chip">YouTube Music<small data-i18n="chip.ext">extension</small></span>
+          <span class="chip">Spotify<small data-i18n="chip.none">no setup</small></span>
+          <span class="chip">Apple Music<small data-i18n="chip.none">no setup</small></span>
         </div>
       </div>
     </section>
 
     <section id="privacy" aria-labelledby="privacy-h">
       <div class="in">
-        <span class="eyebrow">Privacy</span>
-        <h2 id="privacy-h">Playback stays in your browser</h2>
-        <p class="sub">Subline doesn't play or record anything. It only receives what it needs to draw the lines.</p>
+        <span class="eyebrow" data-i18n="nav.privacy">Privacy</span>
+        <h2 id="privacy-h" data-i18n="priv.h">Playback stays in your browser</h2>
+        <p class="sub" data-i18n="priv.sub">Subline doesn't play or record anything. It only receives what it needs to draw the lines.</p>
         <div class="flow">
-          <div class="node"><b>Your browser</b><span>music keeps playing here</span></div>
-          <div class="wires" aria-label="What Subline receives">
-            <span>→ title &amp; artwork</span>
-            <span>→ playback clock</span>
-            <span>→ lyric lines</span>
+          <div class="node"><b data-i18n="node.bh">Your browser</b><span data-i18n="node.b">music keeps playing here</span></div>
+          <div class="wires" aria-label="What Subline receives" data-i18n-aria="wires.aria">
+            <span data-i18n="w0">→ title &amp; artwork</span>
+            <span data-i18n="w1">→ playback clock</span>
+            <span data-i18n="w2">→ lyric lines</span>
           </div>
-          <div class="node"><b>Subline</b><span>shows the lines on top</span></div>
+          <div class="node"><b data-i18n="node.sh">Subline</b><span data-i18n="node.s">shows the lines on top</span></div>
         </div>
         <ul class="privacy-notes">
-          <li>No account, analytics or tracking. Your cookies and YouTube session are never read.</li>
-          <li>Lyrics lookups send the song's title, artist, album and length to lrclib.net, and results are cached on your Mac.</li>
-          <li>The extension sends data only to the Subline app on your Mac. It never runs in private windows.</li>
+          <li data-i18n="n0">No account, analytics or tracking. Your cookies and YouTube session are never read.</li>
+          <li data-i18n="n1">Lyrics lookups send the song's title, artist, album and length to lrclib.net, and results are cached on your Mac.</li>
+          <li data-i18n="n2">The extension sends data only to the Subline app on your Mac. It never runs in private windows.</li>
         </ul>
       </div>
     </section>
 
     <section id="install" aria-labelledby="install-h">
       <div class="in">
-        <span class="eyebrow">Install</span>
-        <h2 id="install-h">Up and running in a minute</h2>
+        <span class="eyebrow" data-i18n="nav.install">Install</span>
+        <h2 id="install-h" data-i18n="inst.h">Up and running in a minute</h2>
         <div class="steps">
-          <div class="step"><h3>Download the app</h3><p>Unzip, move Subline to Applications and open it. A ♪ appears in the menu bar and a setup window opens.</p></div>
-          <div class="step"><h3>YouTube? Add the extension</h3><p>Chrome, Arc, Brave, Edge or Vivaldi. Add it from the setup window, then reload your YouTube tabs.</p></div>
-          <div class="step"><h3>Press play</h3><p>The overlay appears on its own. Spotify and Apple Music need nothing else; macOS asks once if Subline may see what's playing.</p></div>
+          <div class="step"><h3 data-i18n="s0.h">Download the app</h3><p data-i18n="s0.p">Unzip, move Subline to Applications and open it. A ♪ appears in the menu bar and a setup window opens.</p></div>
+          <div class="step"><h3 data-i18n="s1.h">YouTube? Add the extension</h3><p data-i18n="s1.p">Chrome, Arc, Brave, Edge or Vivaldi. Add it from the setup window, then reload your YouTube tabs.</p></div>
+          <div class="step"><h3 data-i18n="s2.h">Press play</h3><p data-i18n="s2.p">The overlay appears on its own. Spotify and Apple Music need nothing else; macOS asks once if Subline may see what's playing.</p></div>
         </div>
         <div class="cta-band">
-          <h2>Your lyrics, right where you look.</h2>
-          <a class="btn light" href="https://github.com/jiunbae/subline/releases/latest" rel="noopener" data-download>Download for macOS</a>
+          <h2 data-i18n="cta">Your lyrics, right where you look.</h2>
+          <a class="btn light" href="https://github.com/jiunbae/subline/releases/latest" rel="noopener" data-download data-i18n="dl">Download for macOS</a>
         </div>
       </div>
     </section>
   </main>
 
   <footer class="in">
-    <span>Subline · made by Jiun Bae</span>
+    <span data-i18n="foot">Subline · made by Jiun Bae</span>
     <nav aria-label="Links">
-      <a href="https://github.com/jiunbae/subline" rel="noopener">Source</a>
-      <a href="https://github.com/jiunbae/subline/releases" rel="noopener">Releases</a>
-      <a href="https://github.com/jiunbae/subline/blob/main/store/PRIVACY.md" rel="noopener">Privacy policy</a>
+      <a href="https://github.com/jiunbae/subline" rel="noopener" data-i18n="src">Source</a>
+      <a href="https://github.com/jiunbae/subline/releases" rel="noopener" data-i18n="rels">Releases</a>
+      <a href="https://github.com/jiunbae/subline/blob/main/store/PRIVACY.md" rel="noopener" data-i18n="policy">Privacy policy</a>
     </nav>
   </footer>
 
   <script>
     (function () {
+
+      // Language: English by default, Korean for Korean browsers; the choice is remembered.
+      var KO = {
+        "nav.film": "영상", "nav.features": "기능", "nav.privacy": "개인정보", "nav.install": "설치",
+        "hero.h": '노래 가사를 <span class="hl">화면 위에</span> 띄워 두세요.',
+        "hero.lede": "YouTube, YouTube Music, Spotify, Apple Music을 들으며 창을 바꾸지 않고 따라 부르세요. 작업 중인 화면 위 작은 창에서 가사가 노래에 맞춰 넘어갑니다.",
+        "dl": "macOS용 다운로드", "ext": "확장 프로그램 받기", "soon": "준비 중",
+        "latest": "최신 버전", "fine": "macOS 14 이상 · Apple 실리콘·Intel · 서명·공증 완료 · 무료",
+        "loop.aria": "노래를 재생하는 브라우저 창이 뒤로 물러나고 Subline 가사 카드가 앞으로 떠오른 뒤, 가사 목록이 노래를 따라 넘어가고 누른 줄로 이동합니다.",
+        "film.h": "25초 만에 살펴보기", "film.sub": "영상 속 화면은 모두 Subline의 실제 오버레이이고, 곡은 지어낸 것입니다.",
+        "film.aria": "25초 동안 보는 Subline: 브라우저 탭 속 가사가 바탕화면 위로 떠오르고, 가사 줄이 제때 켜지며 누른 줄로 재생 위치가 이동합니다. 일본어 가사 아래에는 로마자 표기가 나오고, 지금 가사는 메뉴바와 노치, 미니 플레이어에도 보입니다. 재생은 브라우저에 그대로 있고 Subline은 제목, 재생 시간, 가사만 받습니다.",
+        "feat.h": "따라 부르는 데 필요한 모든 것",
+        "f0.h": "딱 맞는 타이밍", "f0.p": "음악에 맞춰 가사 줄이 켜지고 다음 줄도 미리 보입니다. 줄을 누르면 그 부분으로 이동합니다.",
+        "f1.h": "두 언어를 한 번에", "f1.p": "한국어·일본어·중국어 로마자 표기, YouTube 번역 자막, Apple 기기 내 번역(macOS 26)을 아래 줄에 보여 줍니다.",
+        "f2.h": "원하는 자리에", "f2.p": "커버, 커버+가사, 가사, 미니 레이아웃과 글래스, 틴트, 클리어 스타일을 고를 수 있습니다. 지금 가사를 메뉴바나 노치에 둘 수도 있습니다.",
+        "f3.h": "가사는 알아서", "f3.p": "YouTube Music 자체 가사를 먼저 쓰고, 없으면 LRCLIB에서 찾습니다. 시간이 맞춰진 가사를 항상 우선합니다. 버전이 다르면 다른 것을 고르거나 .lrc 파일을 불러오세요.",
+        "f4.h": "가볍게 동작", "f4.p": "재생 중 CPU 사용량은 1% 안팎이고 쉴 때는 거의 0입니다. 음악을 두 번 재생하지도 않습니다.",
+        "f5.h": "Mac 앱다운 사용감", "f5.p": "macOS 26의 Liquid Glass, 앨범 아트 색 반영, 모든 모서리에서 크기 조절, 클릭 통과 모드, VoiceOver와 한국어 화면을 지원합니다.",
+        "chip.ext": "확장 프로그램", "chip.none": "설정 필요 없음",
+        "priv.h": "재생은 브라우저에서 그대로", "priv.sub": "Subline은 아무것도 재생하거나 녹음하지 않습니다. 가사를 보여 주는 데 필요한 정보만 받습니다.",
+        "node.bh": "브라우저", "node.b": "음악은 여기서 재생", "node.sh": "Subline", "node.s": "가사를 화면 위에 표시",
+        "wires.aria": "Subline이 받는 정보", "w0": "→ 제목과 앨범 아트", "w1": "→ 재생 시간", "w2": "→ 가사 줄",
+        "n0": "계정, 분석, 추적이 없습니다. 쿠키와 YouTube 로그인 정보는 읽지 않습니다.",
+        "n1": "가사를 찾을 때 곡 제목, 가수, 앨범, 길이를 lrclib.net에 보내고, 결과는 Mac에 저장해 둡니다.",
+        "n2": "확장 프로그램은 Mac의 Subline 앱에만 데이터를 보내고, 시크릿 창에서는 동작하지 않습니다.",
+        "inst.h": "1분이면 준비 끝",
+        "s0.h": "앱 다운로드", "s0.p": "압축을 풀고 Subline을 응용 프로그램 폴더로 옮긴 뒤 여세요. 메뉴바에 ♪가 나타나고 설정 창이 열립니다.",
+        "s1.h": "YouTube라면 확장 프로그램", "s1.p": "Chrome, Arc, Brave, Edge, Vivaldi에서 쓸 수 있습니다. 설정 창에서 추가한 뒤 YouTube 탭을 새로고침하세요.",
+        "s2.h": "재생하기", "s2.p": "오버레이가 저절로 나타납니다. Spotify와 Apple Music은 따로 할 일이 없고, 처음 한 번 macOS가 재생 정보 접근을 묻습니다.",
+        "cta": "가사를, 보고 있는 그 자리에.",
+        "foot": "Subline · 만든 사람 Jiun Bae", "src": "소스", "rels": "릴리즈", "policy": "개인정보 처리방침"
+      };
+      var EN = {}, root = document.documentElement;
+      var texts = document.querySelectorAll("[data-i18n]"), arias = document.querySelectorAll("[data-i18n-aria]");
+      texts.forEach(function (el) { EN[el.dataset.i18n] = el.innerHTML; });
+      arias.forEach(function (el) { EN[el.dataset.i18nAria] = el.getAttribute("aria-label"); });
+      var titles = { en: document.title, ko: "Subline · Mac 화면 위에 뜨는 가사" };
+      function setLang(lang) {
+        var d = lang === "ko" ? KO : EN;
+        root.lang = lang;
+        document.title = titles[lang];
+        texts.forEach(function (el) { if (!el.dataset.fixed && d[el.dataset.i18n] != null) el.innerHTML = d[el.dataset.i18n]; });
+        arias.forEach(function (el) { if (d[el.dataset.i18nAria] != null) el.setAttribute("aria-label", d[el.dataset.i18nAria]); });
+        document.querySelectorAll("[data-lang-btn]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.langBtn === lang)); });
+      }
+      var saved = null, q = new URLSearchParams(location.search).get("lang");
+      try { saved = localStorage.getItem("subline-lang"); } catch (e) {}
+      setLang(q === "ko" || q === "en" ? q : saved || ((navigator.language || "en").toLowerCase().indexOf("ko") === 0 ? "ko" : "en"));
+      document.querySelectorAll("[data-lang-btn]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          setLang(b.dataset.langBtn);
+          try { localStorage.setItem("subline-lang", b.dataset.langBtn); } catch (e) {}
+        });
+      });
       // Download buttons go straight to the latest release's app zip; on any failure they keep
       // pointing at the releases page.
       fetch("https://api.github.com/repos/jiunbae/subline/releases/latest", { headers: { Accept: "application/vnd.github+json" } })
@@ -244,7 +307,7 @@
             document.querySelectorAll("[data-download]").forEach(function (a) { a.href = zip.browser_download_url; });
           }
           if (rel.tag_name) {
-            document.querySelectorAll("[data-version]").forEach(function (s) { s.textContent = rel.tag_name; });
+            document.querySelectorAll("[data-version]").forEach(function (s) { s.textContent = rel.tag_name; s.dataset.fixed = "1"; });
           }
         })
         .catch(function () {});
