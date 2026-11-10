@@ -30,6 +30,10 @@
       artwork: artwork(data?.thumbnails, id, false),
       isAd: !!document.querySelector('#movie_player.ad-showing, #movie_player.ad-interrupting')};
   }
+  function songLength() {
+    const max = Number(document.querySelector('ytmusic-player-bar #progress-bar')?.getAttribute('aria-valuemax'));
+    return Number.isFinite(max) && max > 0 ? max : 0;
+  }
   function readYTM(main, video) {
     const id = new URL(location.href).searchParams.get('v') || main?.videoId || '';
     if (!id) return null;
@@ -44,7 +48,9 @@
       title: bar?.querySelector('.title')?.textContent?.trim() || data?.title || '',
       artist: links[0]?.textContent?.trim() || data?.artist || byline?.textContent?.split('•')[0]?.trim() || '',
       album: links.find(a => /browse\/MPRE/.test(a.href))?.textContent?.trim() || links[1]?.textContent?.trim() || '',
-      duration: Number.isFinite(video?.duration) ? video.duration : Number(data?.duration) || 0,
+      // The song's own length (player data, else the progress bar), not the media element's: queued
+      // songs can share one media stream whose duration spans several of them.
+      duration: Number(data?.duration) || songLength() || (Number.isFinite(video?.duration) ? video.duration : 0),
       artwork: artwork(raw, id, true),
       isAd: !!document.querySelector('#movie_player.ad-showing, #movie_player.ad-interrupting')};
   }

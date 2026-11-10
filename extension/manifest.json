@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Subline",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Send YouTube playback, artwork and captions to the Subline macOS overlay.",
   "icons": {
     "16": "icons/icon16.png",

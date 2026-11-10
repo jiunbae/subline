@@ -825,7 +825,7 @@ final class PlayerModel {
             "title": title, "artist": artist, "site": site ?? "", "isAd": isAd, "isPlaying": isPlaying,
             "artwork": artwork != nil, "artworkURL": s?.track?.artwork.first?.url ?? "",
             "cueSource": cueSource ?? "", "cueCount": cues.count, "synced": synced,
-            "position": position(), "currentLine": currentLine ?? "", "tabs": store.tabs.count,
+            "position": position(), "duration": duration ?? 0, "currentLine": currentLine ?? "", "tabs": store.tabs.count,
             "connections": connectionCount,
             "captionTracks": captionTracks.map(\.id), "captionTrackID": captionTrackID ?? "",
             "textStatus": "\(textStatus)", "captionsLoading": captionsLoading,

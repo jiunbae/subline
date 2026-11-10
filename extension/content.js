@@ -5,7 +5,7 @@
   let track = null, main = null, video = null, cues = null, signature = '', captionText = '';
   let visible = true, buffering = false, tick = null, refreshTimer = null;
   let playerObserver = null, barObserver = null, captionObserver = null;
-  let observedPlayer = null, observedBar = null, observedCaptions = null;
+  let observedPlayer = null, observedBar = null, observedCaptions = null, progressObserver = null, observedProgress = null;
   // Per video: caption tracks chosen in the app (slot 1 = main, 2 = secondary) and the last sent track list.
   let preferredTrack = '', secondaryTrack = '', secondaryCues = null, tracksSig = '';
   const cache = new Map(); // Normalized cues only; no request URLs or credentials.
@@ -26,9 +26,30 @@
       captionText = ''; send({type: 'liveCaption', videoId: track.videoId, text: ''});
     }
   }
+  // YouTube Music can play queued songs back to back in one media stream: the <video> clock keeps
+  // counting across songs. Its own progress bar is per song, so on Music the song's position is the
+  // media time minus an offset learned from that bar. The bar shows whole seconds, so the smallest
+  // (media - bar) seen is the offset; a jump of more than 1.5 s (seek, next song) starts over.
+  let offset = 0, offsetFor = '';
+  function songBar() {
+    const bar = music ? document.querySelector('ytmusic-player-bar #progress-bar') : null;
+    const now = Number(bar?.getAttribute('aria-valuenow') ?? bar?.value), max = Number(bar?.getAttribute('aria-valuemax'));
+    return Number.isFinite(now) && Number.isFinite(max) && max > 0 && now >= 0 && now <= max + 1 ? {now, max} : null;
+  }
+  function songTime() {
+    const media = Number.isFinite(video?.currentTime) ? video.currentTime : 0;
+    if (!music) return media;
+    if (offsetFor !== track?.videoId) { offsetFor = track?.videoId || ''; offset = 0; }
+    const bar = songBar();
+    if (bar) {
+      const candidate = Math.max(0, media - bar.now);
+      if (Math.abs(candidate - offset) > 1.5 || candidate < offset) offset = candidate;
+    }
+    return Math.max(0, media - offset);
+  }
   function clock() {
     if (!track || !video) return;
-    send({type: 'clock', videoId: track.videoId, t: Number.isFinite(video.currentTime) ? video.currentTime : 0,
+    send({type: 'clock', videoId: track.videoId, t: songTime(),
       rate: Number.isFinite(video.playbackRate) ? video.playbackRate : 1, paused: video.paused || video.ended,
       buffering});
   }
@@ -83,6 +104,20 @@
             barObserver.observe(node, {subtree:true, childList:true, characterData:true, attributes:true, attributeFilter:['src']});
           }
         } else barObserver.observe(bar, {subtree:true, childList:true, characterData:true});
+      }
+    }
+    // Music: the progress bar re-anchors the song clock when songs share one media stream (see songTime).
+    const progress = music ? document.querySelector('ytmusic-player-bar #progress-bar') : null;
+    if (progress !== observedProgress) {
+      progressObserver?.disconnect(); observedProgress = progress;
+      if (progress) {
+        progressObserver = new MutationObserver(() => {
+          if (!track || !video || track.isAd) return;
+          const before = offset, id = offsetFor;
+          songTime();
+          if (id === offsetFor && Math.abs(offset - before) > 0.5) clock();
+        });
+        progressObserver.observe(progress, {attributes: true, attributeFilter: ['aria-valuenow', 'aria-valuemax']});
       }
     }
     const container = document.querySelector('.ytp-caption-window-container');
@@ -209,7 +244,10 @@
     if (message.type === 'cmd' && video && track && (!message.videoId || message.videoId === track.videoId)) {
       if (message.action === 'play' || (message.action === 'toggle' && video.paused)) void video.play().catch(() => {});
       else if (message.action === 'pause' || message.action === 'toggle') video.pause();
-      else if (message.action === 'seek' && Number.isFinite(message.t)) video.currentTime = Math.max(0, Math.min(message.t, Number.isFinite(video.duration) ? video.duration : message.t));
+      else if (message.action === 'seek' && Number.isFinite(message.t)) {
+        const target = Math.max(0, message.t + (music ? offset : 0));
+        video.currentTime = Math.min(target, Number.isFinite(video.duration) ? video.duration : target);
+      }
       else if (message.action === 'next' || message.action === 'prev') NPAdapters.skip(music, message.action === 'prev');
       clock();
     }
