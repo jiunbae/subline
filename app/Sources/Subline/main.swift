@@ -115,6 +115,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+// `Subline landing-media <dir> [film|loop|preview]` renders the landing page's media offscreen and
+// exits (LandingMedia/LandingMediaMode.swift); no lock, socket, menu or migration.
+if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "landing-media" {
+    let code = MainActor.assumeIsolated {
+        LandingMediaMode.run(outputDir: CommandLine.arguments[2], only: Set(CommandLine.arguments.dropFirst(3)))
+    }
+    exit(code)
+}
+
 // Before anything reads preferences (PlayerModel and friends load them when the delegate is built).
 if !CommandLine.arguments.contains("--store-shot") { LegacyMigration.run() }
 let app = NSApplication.shared

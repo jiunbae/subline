@@ -668,6 +668,26 @@ final class PlayerModel {
     }
     func setPreviewPaused() { isPlaying = false }
 
+    /// Landing film staging only (`Subline landing-media`, see LandingMedia/): a made-up song at media
+    /// time `t`, with the active line chosen by the same `CueTimeline` the live clock uses and the
+    /// second line mapped onto rows the way `refresh()` maps a secondary track.
+    func stageFilm(title: String, artist: String, artwork: NSImage?, accent: Color,
+                   main: CueTimeline, secondary: CueTimeline?, at t: Double) {
+        hasTrack = true; isPlaying = true; isAd = false; site = "ytm"; liveCaption = nil; hovering = false
+        self.title = title; self.artist = artist; self.artwork = artwork; self.accent = accent
+        if cues != main.cues { cues = main.cues }
+        synced = main.synced
+        activeIndex = main.activeIndex(at: t)
+        upcomingIndex = main.upcomingIndex(at: t)
+        let sub = secondary ?? .empty
+        if secondaryCues != sub.cues {
+            secondaryCues = sub.cues
+            secondaryByRow = sub.cues.isEmpty ? [] : main.cues.map { c in sub.activeIndex(at: c.s + 0.05).map { sub.cues[$0].text } }
+        }
+        secondaryActiveIndex = sub.activeIndex(at: t)
+        fastLines = false
+    }
+
     // MARK: Auto captions
 
     /// Up to two attempts per video (2 s and 8 s after playback starts), only while nothing is shown.
