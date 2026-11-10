@@ -182,21 +182,40 @@ final class LandingScenes {
 
     private func desktop(p: Double, lt: Double, stage: CGSize, model: PlayerModel) -> some View {
         LandingSong.sunset.stage(model, at: 6.8 + lt * 0.2)
-        let m = ease(prog(p, 0.04, 0.22)), n = ease(prog(p, 0.2, 0.38)), q = ease(prog(p, 0.6, 0.8))
-        // Starts on the top edge (menu bar, notch), then pulls back to the whole desktop.
-        let camera = 1.6 - 0.6 * ease(prog(p, 0.46, 0.72))
-        return deskPlate(stage: stage, camera: camera, focus: UnitPoint(x: 0.62, y: 0), drift: p) {
-            ZStack(alignment: .topLeading) {
-                MenuBarMock(line: model.currentLine ?? "", highlight: m)
-                NotchView(model: model, notchHeight: 30, hasNotch: true)
-                    .frame(width: 340, height: 62)
-                    .offset(x: (Self.desk.width - 340) / 2, y: -62 * (1 - n))
-                MiniCard(model: model, size: CGSize(width: 420, height: 64))
-                    .offset(x: 70, y: 420 + (1 - q) * 30)
-                    .opacity(q)
-            }
-            .frame(width: Self.desk.width, height: Self.desk.height, alignment: .topLeading)
+        let m = ease(prog(p, 0.08, 0.24)), n = ease(prog(p, 0.16, 0.34))
+        let top = spring(prog(p, 0.0, 0.22)), bottom = spring(prog(p, 0.42, 0.64)), q = ease(prog(p, 0.5, 0.7))
+        // Two close-ups of one made-up desktop, so every placement reads at full size:
+        // the top edge (menu bar line + notch), then the floating card and the mini player.
+        let desk = ZStack(alignment: .topLeading) {
+            FilmWallpaper(drift: p)
+            MenuBarMock(line: model.currentLine ?? "", highlight: m)
+            NotchView(model: model, notchHeight: 30, hasNotch: true)
+                .frame(width: 340, height: 62)
+                .offset(x: (Self.desk.width - 340) / 2, y: -62 * (1 - n))
+            CoverLineCard(model: model, size: CGSize(width: 480, height: 158))
+                .offset(x: 470, y: 312 + (1 - q) * 30).opacity(q)
+            MiniCard(model: model, size: CGSize(width: 380, height: 64))
+                .offset(x: 60, y: 360 + (1 - q) * 30).opacity(q)
         }
+        .frame(width: Self.desk.width, height: Self.desk.height, alignment: .topLeading)
+        let width = stage.width * 0.84
+        func crop(_ r: CGRect) -> some View {
+            let k = width / r.width
+            return StickerPlate {
+                desk.offset(x: -r.minX, y: -r.minY)
+                    .frame(width: r.width, height: r.height, alignment: .topLeading).clipped()
+                    .scaleEffect(k, anchor: .topLeading)
+                    .frame(width: width, height: r.height * k, alignment: .topLeading)
+            }
+        }
+        return VStack(spacing: stage.height * 0.06) {
+            crop(CGRect(x: 280, y: 0, width: 720, height: 84))
+                .scaleEffect(0.8 + 0.2 * top).opacity(min(1, top * 1.4))
+            crop(CGRect(x: 30, y: 290, width: 940, height: 200))
+                .scaleEffect(0.8 + 0.2 * bottom).opacity(min(1, bottom * 1.4))
+        }
+        .frame(width: stage.width, height: stage.height)
+        .offset(y: stage.height * 0.06)
     }
 
     // MARK: 7. Privacy

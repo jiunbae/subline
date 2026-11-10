@@ -107,7 +107,32 @@ public enum Romanizer {
             }
             type = CFStringTokenizerAdvanceToNextToken(tok)
         }
-        return parts.joined(separator: " ").replacingOccurrences(of: #" ([,.!?、。！？」』)])"#, with: "$1", options: .regularExpression)
+        return geminate(parts).joined(separator: " ").replacingOccurrences(of: #" ([,.!?、。！？」』)])"#, with: "$1", options: .regularExpression)
+    }
+
+    /// The tokenizer cuts a word before its trailing small っ and writes it "~tsu" (歌っ|て →
+    /// "uta~tsu te"). Hepburn doubles the next consonant instead: utatte, matte, itta.
+    static func geminate(_ parts: [String]) -> [String] {
+        var out: [String] = []
+        var i = 0
+        while i < parts.count {
+            var p = parts[i]
+            while let r = p.range(of: "~tsu") {
+                let rest = p[r.upperBound...]
+                if let c = rest.first, c.isLetter, !"aeiou".contains(c) {
+                    p.replaceSubrange(r, with: rest.hasPrefix("ch") ? "t" : String(c))
+                } else if rest.isEmpty, i + 1 < parts.count, let c = parts[i + 1].first, c.isLetter, !"aeiou".contains(c) {
+                    let next = parts[i + 1]
+                    p.replaceSubrange(r, with: (next.hasPrefix("ch") ? "t" : String(c)) + next)
+                    i += 1
+                } else {
+                    p.replaceSubrange(r, with: "")
+                }
+            }
+            out.append(p)
+            i += 1
+        }
+        return out
     }
 
     static func pinyin(_ s: String) -> String {

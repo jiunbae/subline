@@ -379,6 +379,11 @@ import Foundation
     @Test func detectsScriptsAndSkipsLatin() {
         #expect(Romanizer.romanize("Hello world") == nil)
         #expect(Romanizer.script(of: "君の名は") == .japanese)
+        // Small っ cut off at a token end doubles the next consonant (not "uta~tsu te").
+        #expect(Romanizer.romanize("歌って") == "utatte")
+        #expect(Romanizer.romanize("夜明けまで 歌っていよう") == "yoake made utatte iyou")
+        #expect(Romanizer.romanize("行った") == "itta")
+        #expect(Romanizer.romanize("きっと") == "kitto")
         #expect(Romanizer.script(of: "你好") == .chinese)
         #expect(Romanizer.script(of: "東京", japanese: true) == .japanese)
     }
