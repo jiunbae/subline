@@ -20,6 +20,8 @@
   <sub><a href="https://subline.jiun.dev/#film">▶ Watch the 25-second film</a> · <a href="https://subline.jiun.dev">subline.jiun.dev</a></sub>
 </p>
 
+<p align="center"><b>English</b> · <a href="README.ko.md">한국어</a></p>
+
 <p align="center">
   <a href="#download">Download</a> ·
   <a href="#quick-start">Quick start</a> ·
@@ -178,7 +180,8 @@ Publishing to the Chrome Web Store (public listing, live) and the one-click inst
 | VoiceOver | The overlay is announced as "title, artist" with the current line as its value, and offers Play/Pause, Next, Previous and Skip ±10 s as actions (the hover controls aren't needed). Lyric lines are buttons; the progress line is adjustable. Menu bar → Skip Back/Forward 10 Seconds |
 | Nothing playing | Shown only when you open the overlay yourself (⌃⌥⌘O): the last video with ▶ resume (plays in its tab if still open, otherwise opens it in the default browser) and up to 3 more recent ones. Menu bar → Recently Played lists them and can clear the list (kept on this Mac only) |
 | Paused | The overlay dims and desaturates, with a ❚❚ mark by the title (a pause glyph on Cover); it fades out after 5 min |
-| No text | Cover + Line shows the title larger instead of an empty slot, with a status chip: Loading captions… / Load captions / Show lyrics (unsynced) |
+| No text | Cover + Line shows the title larger instead of an empty slot, with a status chip: Loading captions… / Load captions |
+| Lyrics without timing | YouTube Music sometimes has lyrics but no timestamps. The verse being sung is estimated from how far the song has played (line length weighted, intro and outro left out): the Lyrics layout lights that verse and keeps it centered, marked "Approximate position"; the cards show its opening lines. Tapping a line does nothing here |
 | Lyrics (YouTube Music, Spotify, Apple Music) | Looked up by the app on LRCLIB (exact match, retried with localized/`(Official Audio)` suffixes removed, then a search matched by title, artist and length ±3 s, skipping instrumentals). Cached on disk, so songs you've heard work offline. Songs LRCLIB doesn't have show the title only |
 | Lyrics versions | Menu → Lyrics: other LRCLIB versions of the song (remembered per song), No Lyrics for This Song, Search Again |
 | Sync per song | Captions → Earlier/Later is remembered for each song or video. Tapping a line in the Lyrics layout plays from it (with that offset) |
