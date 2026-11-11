@@ -192,6 +192,7 @@ private struct PreviewTile: View {
         let scale = min(box.width / size.width, box.height / size.height, 1)
         OverlayContent(model: model, layout: layout, size: size, controller: nil)
             .environment(\.overlayStyle, style)
+            .environment(\.clearContrast, model.clearContrast)
             .environment(\.overlayPreview, true)
             .environment(\.colorScheme, .dark)
             .frame(width: size.width, height: size.height)

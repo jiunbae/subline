@@ -160,6 +160,16 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
             i.state = model.style == st ? .on : .off
             sm.addItem(i)
         }
+        sm.addItem(.separator())
+        let ch = NSMenuItem(title: L10n.string("Clear Style Contrast"), action: nil, keyEquivalent: "")
+        ch.isEnabled = false
+        sm.addItem(ch)
+        for c in ClearContrast.allCases {
+            let i = NSMenuItem(title: c.title, action: #selector(pickClearContrast(_:)), keyEquivalent: "")
+            i.target = self; i.representedObject = c.rawValue; i.indentationLevel = 1
+            i.state = model.clearContrast == c ? .on : .off
+            sm.addItem(i)
+        }
         style.submenu = sm
         menu.addItem(style)
         add("Appearance…", #selector(openAppearance), key: ",")
@@ -470,6 +480,12 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     }
     @objc private func pickStyle(_ s: NSMenuItem) {
         if let r = s.representedObject as? String, let st = OverlayStyle(rawValue: r) { panel.setStyle(st) }
+    }
+    /// Picking a contrast also switches to Clear, so the choice is visible at once.
+    @objc private func pickClearContrast(_ s: NSMenuItem) {
+        guard let r = s.representedObject as? String, let c = ClearContrast(rawValue: r) else { return }
+        model.clearContrast = c
+        if model.style != .clear { panel.setStyle(.clear) }
     }
     @objc private func openAppearance() { model.openAppearance?() }
     @objc private func pickOpacity(_ s: NSMenuItem) {

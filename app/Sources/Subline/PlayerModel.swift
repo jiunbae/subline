@@ -52,6 +52,27 @@ enum OverlayStyle: String, CaseIterable, Identifiable {
     }
 }
 
+/// How the Clear style keeps text readable over whatever is behind the panel.
+enum ClearContrast: String, CaseIterable, Identifiable {
+    /// A soft drop shadow (the original look).
+    case shadow
+    /// A tight dark rim plus a wide soft halo, like film subtitles.
+    case outline
+    /// A faint dark wash behind the text that fades out at its edges.
+    case backdrop
+    /// Rim and wash together.
+    case both
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .shadow: L10n.string("Soft Shadow")
+        case .outline: L10n.string("Outline")
+        case .backdrop: L10n.string("Faint Backdrop")
+        case .both: L10n.string("Outline + Backdrop")
+        }
+    }
+}
+
 /// UI-facing state. Property writes are guarded so SwiftUI only invalidates on real change.
 @MainActor @Observable
 final class PlayerModel {
@@ -134,6 +155,9 @@ final class PlayerModel {
     }
     var style: OverlayStyle = OverlayStyle(rawValue: UserDefaults.standard.string(forKey: "style") ?? "") ?? .glass {
         didSet { UserDefaults.standard.set(style.rawValue, forKey: "style") }
+    }
+    var clearContrast: ClearContrast = ClearContrast(rawValue: UserDefaults.standard.string(forKey: "clearContrast") ?? "") ?? .shadow {
+        didSet { UserDefaults.standard.set(clearContrast.rawValue, forKey: "clearContrast") }
     }
     var opacity: Double = UserDefaults.standard.object(forKey: "opacity") as? Double ?? 1.0 {
         didSet { UserDefaults.standard.set(opacity, forKey: "opacity") }

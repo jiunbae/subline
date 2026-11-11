@@ -162,3 +162,8 @@
 "An LRC file has lines like “[01:23.45] lyrics”." = "LRC 파일은 “[01:23.45] 가사” 같은 줄로 되어 있습니다.";
 "Approximate position" = "대략적인 위치";
 "These lyrics have no timing. The highlighted verse is estimated from how far the song has played." = "이 가사에는 시간 정보가 없습니다. 강조된 구절은 곡이 재생된 정도로 추정한 위치입니다.";
+"Clear Style Contrast" = "투명 스타일 대비";
+"Soft Shadow" = "부드러운 그림자";
+"Outline" = "외곽선";
+"Faint Backdrop" = "옅은 배경";
+"Outline + Backdrop" = "외곽선 + 옅은 배경";

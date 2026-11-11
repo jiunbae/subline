@@ -165,6 +165,7 @@ Publishing to the Chrome Web Store (public listing, live) and the one-click inst
 | Placement | Anywhere below the menu bar, including over the Dock. Snaps to the screen edge or to just above the Dock |
 | Options | Right-click the overlay (same menu as the menu bar), or **Appearance…** (⌘,) for the gallery |
 | Style | **Glass** (transparent; text on Liquid Glass on macOS 26+, HUD material before), **Tinted**, **Clear** |
+| Clear style contrast | Style → Clear Style Contrast: Soft Shadow (default), Outline, Faint Backdrop, or both, for text over white pages or busy pictures |
 | Show/hide automatically | On by default: appears when playback starts, fades 2.5 s after the tab goes away or after 5 min paused. A manual hide lasts for the current video |
 | Play/pause | Double-click the panel · hover controls · ⌃⌥⌘Space |
 | Show/hide overlay | ⌃⌥⌘O |

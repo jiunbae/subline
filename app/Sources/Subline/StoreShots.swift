@@ -20,6 +20,7 @@ enum StoreShots {
             case "banner": return (CGSize(width: 1600, height: 560), AnyView(Banner(model: model)))
             case "social": return (CGSize(width: 1280, height: 640), AnyView(SocialCard(model: model)))
             case "idle": return (CGSize(width: 1280, height: 800), AnyView(ShotIdle()))
+            case "contrast": return (CGSize(width: 1500, height: 760), AnyView(ContrastSheet(model: model)))
             default: return (CGSize(width: 1280, height: 800), AnyView(ShotHero(model: model)))
             }
         }()
@@ -230,6 +231,64 @@ private struct SocialCard: View {
                 Lockup(iconSize: 104)
                 Overlay(model: model, style: .glass, layout: .coverLine, size: CGSize(width: 600, height: 190))
             }
+        }
+    }
+}
+
+/// Dev comparison (not a store asset): each Clear contrast option over a white page, a busy bright
+/// picture and a dark desktop.
+private struct ContrastSheet: View {
+    let model: PlayerModel
+    private let size = CGSize(width: 340, height: 104)
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            ForEach(ClearContrast.allCases) { c in
+                HStack(spacing: 14) {
+                    Text(c.title).font(.system(size: 15, weight: .semibold)).foregroundStyle(.black)
+                        .frame(width: 130, alignment: .leading)
+                    ForEach(0..<3, id: \.self) { bg in
+                        ZStack {
+                            backdrop(bg)
+                            OverlayContent(model: model, layout: .coverLine, size: size, controller: nil)
+                                .environment(\.overlayStyle, .clear)
+                                .environment(\.clearContrast, c)
+                                .environment(\.overlayPreview, true)
+                                .frame(width: size.width, height: size.height)
+                        }
+                        .frame(width: 420, height: 160).clipped()
+                    }
+                }
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color(white: 0.93))
+    }
+
+    @ViewBuilder private func backdrop(_ i: Int) -> some View {
+        switch i {
+        case 0: // a document: white with grey text rows
+            ZStack(alignment: .topLeading) {
+                Color.white
+                VStack(alignment: .leading, spacing: 9) {
+                    ForEach(0..<9, id: \.self) { r in
+                        Capsule().fill(Color(white: 0.55)).frame(width: CGFloat(260 + (r * 53) % 130), height: 7)
+                    }
+                }.padding(16)
+            }
+        case 1: // a bright, busy picture
+            ZStack {
+                LinearGradient(colors: [Color(red: 1, green: 0.86, blue: 0.55), Color(red: 0.62, green: 0.86, blue: 1)],
+                               startPoint: .topLeading, endPoint: .bottomTrailing)
+                ForEach(0..<14, id: \.self) { k in
+                    Circle().fill([Color.white, .yellow, .pink, .cyan, .orange][k % 5].opacity(0.85))
+                        .frame(width: CGFloat(30 + (k * 37) % 70))
+                        .offset(x: CGFloat((k * 97) % 400) - 200, y: CGFloat((k * 61) % 150) - 75)
+                }
+            }
+        default: // a dark desktop
+            LinearGradient(colors: [Color(red: 0.08, green: 0.09, blue: 0.2), Color(red: 0.2, green: 0.1, blue: 0.3)],
+                           startPoint: .top, endPoint: .bottom)
         }
     }
 }

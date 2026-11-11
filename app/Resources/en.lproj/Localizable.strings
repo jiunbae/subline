@@ -162,3 +162,8 @@
 "An LRC file has lines like “[01:23.45] lyrics”." = "An LRC file has lines like “[01:23.45] lyrics”.";
 "Approximate position" = "Approximate position";
 "These lyrics have no timing. The highlighted verse is estimated from how far the song has played." = "These lyrics have no timing. The highlighted verse is estimated from how far the song has played.";
+"Clear Style Contrast" = "Clear Style Contrast";
+"Soft Shadow" = "Soft Shadow";
+"Outline" = "Outline";
+"Faint Backdrop" = "Faint Backdrop";
+"Outline + Backdrop" = "Outline + Backdrop";

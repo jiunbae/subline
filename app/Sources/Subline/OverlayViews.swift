@@ -9,11 +9,16 @@ private let floatInset: CGFloat = 6
 // MARK: - Style environment
 
 private struct OverlayStyleKey: EnvironmentKey { static let defaultValue: OverlayStyle = .tinted }
+private struct ClearContrastKey: EnvironmentKey { static let defaultValue: ClearContrast = .shadow }
 private struct OverlayPreviewKey: EnvironmentKey { static let defaultValue = false }
 extension EnvironmentValues {
     var overlayStyle: OverlayStyle {
         get { self[OverlayStyleKey.self] }
         set { self[OverlayStyleKey.self] = newValue }
+    }
+    var clearContrast: ClearContrast {
+        get { self[ClearContrastKey.self] }
+        set { self[ClearContrastKey.self] = newValue }
     }
     /// True inside the appearance gallery: blur what is in the window, not what is behind it.
     var overlayPreview: Bool {
@@ -28,13 +33,33 @@ struct TextBacking<S: InsettableShape>: ViewModifier {
     let shape: S
     @Environment(\.overlayStyle) private var style
     @Environment(\.overlayPreview) private var preview
+    @Environment(\.clearContrast) private var contrast
 
     func body(content: Content) -> some View {
         switch style {
         case .tinted:
             content
         case .clear:
-            content.shadow(color: .black.opacity(0.6), radius: 2.5, y: 1)
+            let rim = contrast == .outline || contrast == .both
+            let wash = contrast == .backdrop || contrast == .both
+            Group {
+                if rim {
+                    // One composited layer, two shadows: a tight dark rim keeps glyphs readable on white,
+                    // a wide halo separates them from busy pictures. Measured cheapest of the variants
+                    // tried (per-leaf or three shadows cost more; drawingGroup added ~45 MB).
+                    content.compositingGroup()
+                        .shadow(color: .black, radius: 1)
+                        .shadow(color: .black.opacity(0.5), radius: 6)
+                } else {
+                    content.shadow(color: .black.opacity(0.6), radius: 2.5, y: 1)
+                }
+            }
+            // Wash: a static shape (not redrawn per line) blurred so it has no visible edge.
+            .background {
+                if wash {
+                    shape.fill(.black.opacity(0.55)).padding(2).blur(radius: 16).allowsHitTesting(false)
+                }
+            }
         case .glass:
             if #available(macOS 26.0, *) {
                 content.glassEffect(.regular.tint(.black.opacity(0.22)), in: shape)
@@ -77,6 +102,7 @@ struct OverlayRoot: View {
         }
         .environment(\.colorScheme, .dark)
         .environment(\.overlayStyle, model.style)
+        .environment(\.clearContrast, model.clearContrast)
     }
 }
 
