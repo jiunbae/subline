@@ -102,8 +102,8 @@ Playback stays in your browser. The app only receives metadata, the clock and ca
 
 Get `Subline-<version>.zip` from the [latest release](https://github.com/jiunbae/subline/releases/latest)
 (Developer ID signed and notarized, universal, macOS 14+), unzip it, move `Subline.app` to Applications and open it.
-The browser extension for YouTube is in Chrome Web Store review (public listing); until it is live, the setup window
-installs the bundled copy.
+Then add the browser extension from the
+[Chrome Web Store](https://chromewebstore.google.com/detail/dmlghghkjljpbokmhdnhjkpfkpmlhieb); the setup window links to it.
 
 ## Quick start
 
@@ -150,7 +150,7 @@ Everything below is optional except the extension (for YouTube) and Automation (
 4. If the app isn't running, the extension's connection attempt launches it. After you quit from the menu,
    it stays quit until you open it yourself.
 
-Publishing to the Chrome Web Store (public listing, in review) and the one-click install path: [store/SUBMISSION.md](store/SUBMISSION.md).
+Publishing to the Chrome Web Store (public listing, live) and the one-click install path: [store/SUBMISSION.md](store/SUBMISSION.md).
 </details>
 
 <details>
