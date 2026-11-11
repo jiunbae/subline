@@ -73,6 +73,12 @@ final class PlayerModel {
     private(set) var cueSource: String?
     private(set) var activeIndex: Int?
     private(set) var upcomingIndex: Int?
+    /// Untimed lyrics placed by playback position (`LyricsEstimate`): whether a placement exists, and
+    /// the cue range of the stanza probably being sung (nil during the intro).
+    private(set) var lyricsEstimated = false
+    private(set) var estimatedStanza: Range<Int>?
+    @ObservationIgnored private var estimate: LyricsEstimate?
+    @ObservationIgnored private var estimateFor: ([Cue], Double)?
     /// Lines are changing faster than every 2 s (auto-generated captions): views skip their
     /// transitions, which would otherwise be running most of the time.
     private(set) var fastLines = false
@@ -112,7 +118,7 @@ final class PlayerModel {
     }
     var textStatus: TextStatus {
         if isAd { return .none }
-        if liveCaption != nil || (synced && !cues.isEmpty) { return .timed }
+        if liveCaption != nil || (synced && !cues.isEmpty) || lyricsEstimated { return .timed }
         if !cues.isEmpty { return .unsynced }
         if captionsLoading || lyricsSearching { return .loading }
         if site == "yt" && !captionTracks.isEmpty { return .available }
@@ -239,7 +245,14 @@ final class PlayerModel {
 
     /// The following synced line, shown dimmed under the current one.
     var nextLine: String? {
-        guard showNextLine, synced, let i = upcomingIndex, i < cues.count else { return nil }
+        guard showNextLine else { return nil }
+        if !synced {
+            // Estimated: the stanza's second line, or the first stanza's opening line during the intro.
+            guard let e = estimate else { return nil }
+            if let r = estimatedStanza { return r.count > 1 ? cues[r.lowerBound + 1].text : nil }
+            return e.stanzas.first.map { cues[$0.lowerBound].text }
+        }
+        guard let i = upcomingIndex, i < cues.count else { return nil }
         return cues[i].text
     }
 
@@ -250,6 +263,7 @@ final class PlayerModel {
 
     var currentLine: String? {
         if let i = activeIndex, i < cues.count { return cues[i].text }
+        if let r = estimatedStanza, r.lowerBound < cues.count { return cues[r.lowerBound].text }
         return liveCaption
     }
 
@@ -411,11 +425,13 @@ final class PlayerModel {
             assign(\.cues, [])
             assign(\.activeIndex, nil)
             assign(\.upcomingIndex, nil)
+            assign(\.estimatedStanza, nil)
             assign(\.secondaryCues, [])
             assign(\.secondaryActiveIndex, nil)
             assign(\.secondaryTrackID, nil)
             assign(\.secondaryByRow, [])
             assign(\.liveCaption, nil)
+            estimate = nil; estimateFor = nil; assign(\.lyricsEstimated, false)
             assign(\.captionTracks, [])
             assign(\.translations, [])
             assign(\.captionTrackID, nil)
@@ -469,6 +485,7 @@ final class PlayerModel {
         }
         assign(\.secondaryTrackID, sub?.trackID)
         assign(\.synced, cueSet?.synced ?? false)
+        updateEstimate(duration: t.duration)
         assign(\.cueSource, cueSet?.source)
         assign(\.liveCaption, (t.isAd ?? false) ? nil : s.liveCaption)
         assign(\.captionTracks, s.captionTracks)
@@ -848,13 +865,23 @@ final class PlayerModel {
             "position": position(), "duration": duration ?? 0, "currentLine": currentLine ?? "", "tabs": store.tabs.count,
             "connections": connectionCount,
             "captionTracks": captionTracks.map(\.id), "captionTrackID": captionTrackID ?? "",
-            "textStatus": "\(textStatus)", "captionsLoading": captionsLoading,
+            "textStatus": "\(textStatus)", "estimatedStanza": estimatedStanza.map { "\($0.lowerBound)..<\($0.upperBound)" } ?? "", "captionsLoading": captionsLoading,
             "secondaryTrackID": secondaryTrackID ?? "", "derivedNote": derivedNote ?? "", "preferredSecondary": preferredSecondaryID ?? "", "secondaryCount": secondaryCues.count, "secondaryLine": secondaryLine ?? "",
             "extensionOutdated": extensionOutdated.map { "\($0.running)<\($0.bundled)" } ?? "",
         ]
         if let d = try? JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted, .sortedKeys]) {
             try? d.write(to: SublinePaths.supportDir.appendingPathComponent("debug-state.json"), options: .atomic)
         }
+    }
+
+    /// Places untimed lyrics by playback position; rebuilt only when the lines or the duration change.
+    private func updateEstimate(duration: Double?) {
+        let d = (synced || cues.isEmpty) ? 0 : (duration ?? 0)
+        if let (c, prev) = estimateFor, c == cues, prev == d { return }
+        estimateFor = (cues, d)
+        estimate = d > 0 ? LyricsEstimate(lines: cues.map(\.text), duration: d) : nil
+        assign(\.lyricsEstimated, estimate != nil)
+        if estimate == nil { assign(\.estimatedStanza, nil) }
     }
 
     /// Updates the active cue and arms a single timer for the next cue boundary.
@@ -864,6 +891,7 @@ final class PlayerModel {
         guard let s = store.active, let clock = s.clock, !isAd else {
             assign(\.activeIndex, nil)
             assign(\.upcomingIndex, nil)
+            assign(\.estimatedStanza, nil)
             return
         }
         guard showingText else { return } // nothing to draw; resume on show
@@ -881,10 +909,11 @@ final class PlayerModel {
         }
         assign(\.activeIndex, newIndex)
         assign(\.upcomingIndex, s.timeline.upcomingIndex(at: mediaT))
+        assign(\.estimatedStanza, estimate?.stanza(at: mediaT).map { estimate!.stanzas[$0] })
         assign(\.secondaryActiveIndex, secondaryCues.isEmpty ? nil : s.secondaryTimeline.activeIndex(at: mediaT))
         // Stop at the end of media; never re-arm for a deadline that already passed.
         if let d = clock.duration, d > 0, position >= d { return }
-        let boundaries = [s.timeline.nextBoundary(after: mediaT),
+        let boundaries = [s.timeline.nextBoundary(after: mediaT), estimate?.nextBoundary(after: mediaT),
                           secondaryCues.isEmpty ? nil : s.secondaryTimeline.nextBoundary(after: mediaT)].compactMap { $0 }
         guard let boundary = boundaries.min(),
               let wall = clock.wallTime(forMedia: boundary + captionOffset), wall > now - 0.05 else { return }

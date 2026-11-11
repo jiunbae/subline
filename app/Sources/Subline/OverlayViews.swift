@@ -483,6 +483,16 @@ struct LyricsLayout: View {
             Group {
                 if !model.cues.isEmpty {
                     LyricsList(model: model, fontSize: fs)
+                        .overlay(alignment: .topTrailing) {
+                            if !model.synced && model.lyricsEstimated {
+                                // The highlight is a guess from the playback position; say so.
+                                Label("Approximate position", systemImage: "wave.3.right")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(.white.opacity(0.55))
+                                    .padding(.top, 8)
+                                    .help(L10n.string("These lyrics have no timing. The highlighted verse is estimated from how far the song has played."))
+                            }
+                        }
                 } else if model.liveCaption != nil {
                     VStack {
                         Spacer(minLength: 0)
@@ -509,6 +519,9 @@ struct LyricsList: View {
     @State private var lastLineChange: Date = .distantPast
 
     private static let anchor = UnitPoint(x: 0, y: 0.45)
+    private static func middle(_ r: Range<Int>) -> Int { r.lowerBound + (r.count - 1) / 2 }
+    /// The row to keep centered: the current line, or the middle of the estimated stanza.
+    private var focusRow: Int? { model.activeIndex ?? model.estimatedStanza.map(Self.middle) }
 
     var body: some View {
         GeometryReader { geo in
@@ -521,9 +534,12 @@ struct LyricsList: View {
                         // `active` flips, not the whole list.
                         let cues = model.cues, synced = model.synced, activeIndex = model.activeIndex
                         let subs = model.secondaryByRow
+                        // Untimed lyrics: the estimated stanza is lit as a block (no single line claimed).
+                        let stanza = synced ? nil : model.estimatedStanza
                         ForEach(cues.indices, id: \.self) { i in
                             LyricRow(text: cues[i].text, sub: i < subs.count ? subs[i] : nil,
-                                     active: synced && i == activeIndex, synced: synced, fontSize: fontSize)
+                                     active: synced ? i == activeIndex : stanza?.contains(i) == true,
+                                     synced: synced || stanza != nil, fontSize: fontSize)
                                 .equatable()
                                 .id(i)
                                 .onTapGesture { model.seek(toCue: i) }
@@ -539,6 +555,10 @@ struct LyricsList: View {
                 .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.12),
                                              .init(color: .black, location: 0.82), .init(color: .clear, location: 1)],
                                      startPoint: .top, endPoint: .bottom))
+                .onChange(of: model.estimatedStanza) { _, r in
+                    guard let r, Date().timeIntervalSince(userScrolledAt) > 3 else { return }
+                    withAnimation(.easeInOut(duration: 0.6)) { proxy.scrollTo(Self.middle(r), anchor: Self.anchor) }
+                }
                 .onChange(of: model.activeIndex) { _, idx in
                     let now = Date()
                     defer { lastLineChange = now }
@@ -553,9 +573,9 @@ struct LyricsList: View {
                 }
                 // Re-center after a resize (no animation: the frame is already moving).
                 .onChange(of: geo.size.height) { _, _ in
-                    if let i = model.activeIndex { proxy.scrollTo(i, anchor: Self.anchor) }
+                    if let i = focusRow { proxy.scrollTo(i, anchor: Self.anchor) }
                 }
-                .onAppear { if let i = model.activeIndex { proxy.scrollTo(i, anchor: Self.anchor) } }
+                .onAppear { if let i = focusRow { proxy.scrollTo(i, anchor: Self.anchor) } }
             }
         }
     }

@@ -409,3 +409,34 @@ import Foundation
         #expect(store.active?.secondaryCueSet == nil)
     }
 }
+
+@Suite struct LyricsEstimateTests {
+    let song = ["Verse one a", "Verse one b", "", "Chorus a", "Chorus b", "", "Verse two a", "Verse two b"]
+
+    @Test func stanzasFollowBlankLinesAndSpanTheSong() throws {
+        let e = try #require(LyricsEstimate(lines: song, duration: 200))
+        #expect(e.stanzas == [0..<2, 3..<5, 6..<8])
+        #expect(e.starts.first == 16) // 8% intro
+        #expect(e.stanza(at: 5) == nil)
+        #expect(e.stanza(at: 20) == 0)
+        #expect(e.stanza(at: 100) == 1)
+        #expect(e.stanza(at: 199) == 2)
+        #expect(e.nextBoundary(after: 20) == e.starts[1])
+        #expect(e.nextBoundary(after: 199) == nil)
+    }
+
+    @Test func longerLinesTakeLonger() throws {
+        let e = try #require(LyricsEstimate(lines: ["short", "", String(repeating: "long words here ", count: 4), "", "short"], duration: 100))
+        #expect(e.starts[2] - e.starts[1] > e.starts[1] - e.starts[0])
+    }
+
+    @Test func aLongBlockIsCutIntoChunksWithoutAOneLineTail() throws {
+        let e = try #require(LyricsEstimate(lines: (1...9).map { "line \($0)" }, duration: 180))
+        #expect(e.stanzas == [0..<4, 4..<9])
+    }
+
+    @Test func nothingToPlace() {
+        #expect(LyricsEstimate(lines: song, duration: 10) == nil)
+        #expect(LyricsEstimate(lines: ["one", "two"], duration: 200) == nil)
+    }
+}

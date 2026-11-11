@@ -160,3 +160,5 @@
 "Synced lyrics for “%@”" = "“%@”의 시간 맞춤 가사";
 "No timed lines in this file" = "이 파일에는 시간이 붙은 줄이 없습니다";
 "An LRC file has lines like “[01:23.45] lyrics”." = "LRC 파일은 “[01:23.45] 가사” 같은 줄로 되어 있습니다.";
+"Approximate position" = "대략적인 위치";
+"These lyrics have no timing. The highlighted verse is estimated from how far the song has played." = "이 가사에는 시간 정보가 없습니다. 강조된 구절은 곡이 재생된 정도로 추정한 위치입니다.";
