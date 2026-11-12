@@ -195,7 +195,8 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
             lang.submenu = lm
             cm.addItem(lang)
         }
-        if !model.captionTracks.isEmpty || (model.synced && !model.cues.isEmpty) {
+        // Untimed lyrics too: romanization and translation follow the lines, not their times.
+        if !model.captionTracks.isEmpty || !model.cues.isEmpty {
             let second = NSMenuItem(title: L10n.string("Second Language"), action: nil, keyEquivalent: "")
             let sm2 = NSMenu(); sm2.autoenablesItems = false
             addSecondaryLanguages(to: sm2)

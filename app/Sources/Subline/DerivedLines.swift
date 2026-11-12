@@ -47,14 +47,20 @@ enum DerivedLines {
         cues.prefix(80).contains { Romanizer.script(of: $0.text) != nil }
     }
 
+    /// One cue per main cue, same times, in the same order; "" where a line has nothing to add. The
+    /// rows stay aligned with the main text, so the second line can follow it by position (untimed
+    /// lyrics have no times to match on).
     static func romanized(_ cues: [Cue], lang: String?) -> [Cue] {
         let japanese = lang == "ja"
         var memo: [String: String?] = [:]
-        return cues.compactMap { c in
+        return cues.map { c in
             let r = memo[c.text] ?? { let v = Romanizer.romanize(c.text, japanese: japanese); memo[c.text] = v; return v }()
-            return r.map { Cue(s: c.s, e: c.e, text: $0) }
+            return Cue(s: c.s, e: c.e, text: r ?? "")
         }
     }
+
+    /// Whether a derived set has anything to show.
+    static func hasText(_ cues: [Cue]) -> Bool { cues.contains { !$0.text.isEmpty } }
 
     enum Translation: Sendable {
         case cues([Cue])
@@ -88,7 +94,7 @@ enum DerivedLines {
             for r in responses { if let i = r.clientIdentifier.flatMap(Int.init), i < chunk.count { map[chunk[i]] = r.targetText } }
             if Task.isCancelled { return .unavailable }
         }
-        return .cues(cues.compactMap { c in map[c.text].map { Cue(s: c.s, e: c.e, text: $0) } })
+        return .cues(cues.map { c in Cue(s: c.s, e: c.e, text: map[c.text] ?? "") })
         #else
         return .unavailable
         #endif

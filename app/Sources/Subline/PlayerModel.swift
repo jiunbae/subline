@@ -281,8 +281,13 @@ final class PlayerModel {
     }
 
     var secondaryLine: String? {
-        guard let i = secondaryActiveIndex, i < secondaryCues.count else { return nil }
+        guard let i = secondaryActiveIndex, i < secondaryCues.count, !secondaryCues[i].text.isEmpty else { return nil }
         return secondaryCues[i].text
+    }
+    /// The second line was made on this Mac from the main text, one row per main row: it follows the
+    /// main text by position rather than by time.
+    private var secondaryFollowsRows: Bool {
+        DerivedLines.isDerived(secondaryTrackID) && secondaryCues.count == cues.count
     }
 
     var currentLine: String? {
@@ -500,14 +505,14 @@ final class PlayerModel {
         // Rebuild when either track's content changes (not just the row count: a different main track
         // with the same number of lines must not keep the old mapping). Equal arrays share storage, so
         // this is a pointer check on ordinary ticks.
+        assign(\.secondaryTrackID, sub?.trackID)
         if subCues != secondaryCues || cues != secondaryMappedFor {
             secondaryMappedFor = cues
             assign(\.secondaryCues, subCues)
-            assign(\.secondaryByRow, subCues.isEmpty ? [] : cues.map { c in
-                s.secondaryTimeline.activeIndex(at: c.s + 0.05).map { s.secondaryTimeline.cues[$0].text }
-            })
+            assign(\.secondaryByRow, subCues.isEmpty ? [] : secondaryFollowsRows
+                ? subCues.map { $0.text.isEmpty ? nil : $0.text }
+                : cues.map { c in s.secondaryTimeline.activeIndex(at: c.s + 0.05).map { s.secondaryTimeline.cues[$0].text } })
         }
-        assign(\.secondaryTrackID, sub?.trackID)
         assign(\.synced, cueSet?.synced ?? false)
         updateEstimate(duration: t.duration)
         assign(\.cueSource, cueSet?.source)
@@ -544,7 +549,7 @@ final class PlayerModel {
 
     /// Romanized / translated second line for the current main text (rebuilt when the text changes).
     private func scheduleDerived(_ s: TabState, _ t: TrackInfo, _ main: CueSet?) {
-        guard let pref = preferredSecondaryID, DerivedLines.isDerived(pref), let main, main.synced, !cues.isEmpty, !(t.isAd ?? false) else { return }
+        guard let pref = preferredSecondaryID, DerivedLines.isDerived(pref), let main, !cues.isEmpty, !(t.isAd ?? false) else { return }
         let sig = ["\(s.key)", t.videoId, pref, main.trackID ?? main.source].joined(separator: "|")
         // Same session/track/choice and the same main text (equal arrays usually share storage) → done.
         guard sig != derivedSig || cues != derivedFor else { return }
@@ -566,7 +571,7 @@ final class PlayerModel {
             var download: (String, String)?
             if pref == DerivedLines.romajiID {
                 out = await Task.detached(priority: .utility) { DerivedLines.romanized(source, lang: lang) }.value
-                if out.isEmpty { note = L10n.string("Nothing to romanize in this text") }
+                if !DerivedLines.hasText(out) { note = L10n.string("Nothing to romanize in this text") }
             } else {
                 switch await DerivedLines.translated(source, source: lang) {
                 case let .cues(c): out = c
@@ -577,6 +582,8 @@ final class PlayerModel {
                 case .unavailable: note = L10n.string("Translation isn't available for this language")
                 }
             }
+            // All rows empty: apply no set at all, so the next-line preview isn't held back for nothing.
+            if !DerivedLines.hasText(out) { out = [] }
             guard !Task.isCancelled, let self, self.derivedGen == gen, self.store.active?.key == key,
                   self.store.active?.track?.videoId == vid else { return }
             self.assign(\.derivedNote, note)
@@ -934,7 +941,12 @@ final class PlayerModel {
         assign(\.activeIndex, newIndex)
         assign(\.upcomingIndex, s.timeline.upcomingIndex(at: mediaT))
         assign(\.estimatedStanza, estimate?.stanza(at: mediaT).map { estimate!.stanzas[$0] })
-        assign(\.secondaryActiveIndex, secondaryCues.isEmpty ? nil : s.secondaryTimeline.activeIndex(at: mediaT))
+        // A second line made from the main text sits under whichever main line is showing (the
+        // estimated stanza's first line for untimed lyrics); a caption track follows its own times.
+        let secondary: Int? = secondaryCues.isEmpty ? nil
+            : secondaryFollowsRows ? (synced ? newIndex : estimatedStanza?.lowerBound)
+            : s.secondaryTimeline.activeIndex(at: mediaT)
+        assign(\.secondaryActiveIndex, secondary)
         // Stop at the end of media; never re-arm for a deadline that already passed.
         if let d = clock.duration, d > 0, position >= d { return }
         let boundaries = [s.timeline.nextBoundary(after: mediaT), estimate?.nextBoundary(after: mediaT),
